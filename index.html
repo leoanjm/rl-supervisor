@@ -31,13 +31,66 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .value { font-weight: 600; text-align: right; white-space: nowrap; }
 .green { color: #3fb950; } .red { color: #f85149; } .blue { color: #58a6ff; }
 .node-head { display: flex; align-items: center; gap: 12px;
-             margin: 26px 0 14px; flex-wrap: wrap; }
+             justify-content: space-between; margin: 26px 0 14px;
+             flex-wrap: wrap; }
+.node-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .node-name { font-size: 18px; font-weight: 700; }
+.node-source { color: #8b949e; font-size: 11px; }
+.node-link { width: auto; margin: 0; padding: 0; border: 0; border-radius: 0;
+             background: transparent; color: inherit; display: flex;
+             align-items: baseline; gap: 9px; text-align: left; }
+.node-link:hover .node-name { color: #58a6ff; }
+.node-link:focus-visible { outline: 2px solid #58a6ff; outline-offset: 5px; }
+.node-open { color: #58a6ff; font-size: 11px; }
+.node-summaries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                  gap: 20px; align-items: start; }
+.node-summary { min-width: 0; }
+.node-summary .node-head { margin: 20px 0 12px; }
+.node-summary .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.node-summary .card { min-width: 0; padding: 14px; }
+.node-summary .metric { gap: 8px; padding: 6px 0; }
+.node-summary .value { overflow: hidden; text-overflow: ellipsis; }
 .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px;
          font-weight: 700; border: 1px solid #30363d; }
 .on { color: #3fb950; border-color: #3fb950; }
 .off { color: #f85149; border-color: #f85149; }
+.warn { color: #d29922; border-color: #d29922; }
 .wide { grid-column: 1 / -1; }
+.training-card.concurrent { border-color: #d29922; }
+.card-title-line { display: flex; align-items: center; justify-content: space-between;
+                   gap: 10px; margin-bottom: 12px; }
+.card-title-line .card-title { margin: 0; }
+.run-count { color: #8b949e; font-size: 10px; white-space: nowrap; }
+.concurrent-notice { color: #d29922; background: rgba(210, 153, 34, 0.08);
+                     border: 1px solid rgba(210, 153, 34, 0.45);
+                     border-radius: 7px; padding: 8px 10px; margin-bottom: 10px;
+                     font-size: 11px; line-height: 1.45; }
+.process-list { display: flex; flex-direction: column; gap: 10px; }
+.process-item { min-width: 0; padding: 11px; border: 1px solid #30363d;
+                border-radius: 8px; background: #0d1117; }
+.process-item.primary { border-color: #238636; background: #0d1610; }
+.process-head { display: flex; align-items: center; justify-content: space-between;
+                gap: 8px; margin-bottom: 5px; }
+.process-name { min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; color: #c9d1d9; font-size: 11px;
+                font-weight: 700; }
+.process-role { flex: 0 0 auto; padding: 2px 6px; border: 1px solid #30363d;
+                border-radius: 10px; color: #8b949e; font-size: 9px;
+                font-weight: 700; }
+.process-role.primary { color: #3fb950; border-color: #238636; }
+.process-item .metric { padding: 5px 0; font-size: 11px; }
+.process-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 12px; }
+.process-section .node-head { margin-top: 18px; }
+.detail-toolbar { display: flex; justify-content: space-between; align-items: center;
+                  gap: 12px; margin: 22px 0 8px; flex-wrap: wrap; }
+.detail-nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.nav-btn { width: auto; margin: 0; padding: 7px 11px; border: 1px solid #30363d;
+           background: #21262d; color: #c9d1d9; font-size: 12px; }
+.nav-btn:hover { background: #30363d; }
+.nav-btn.active { color: #58a6ff; border-color: #58a6ff; background: #111923; }
+.detail-title { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; }
+.empty-card { color: #8b949e; text-align: center; padding: 28px 18px; }
 #gate { max-width: 380px; margin: 12vh auto; }
 input { width: 100%; padding: 10px; border-radius: 8px;
         border: 1px solid #30363d; background: #0d1117; color: #e6edf3;
@@ -47,7 +100,79 @@ button { width: 100%; margin-top: 10px; padding: 10px; border: none;
          font-family: inherit; font-size: 14px; font-weight: 600;
          cursor: pointer; }
 #err { color: #f85149; margin-top: 12px; min-height: 18px; }
-#alerts .metric { border-bottom-color: #30363d; }
+.alert-card { padding: 0; overflow: hidden; margin-bottom: 20px; }
+.alert-header { display: flex; align-items: center; justify-content: space-between;
+                gap: 14px; padding: 16px 18px; border-bottom: 1px solid #30363d;
+                flex-wrap: wrap; }
+.alert-heading { display: flex; align-items: center; gap: 10px; }
+.alert-heading .card-title { margin: 0; }
+.alert-count { color: #8b949e; font-size: 11px; }
+.alert-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.alert-btn { width: auto; margin: 0; padding: 6px 10px; border-radius: 6px;
+             border: 1px solid #30363d; background: #21262d; color: #c9d1d9;
+             font-size: 11px; font-weight: 600; }
+.alert-btn:hover { background: #30363d; }
+.alert-btn.danger { color: #ff7b72; }
+.alert-list { display: flex; flex-direction: column; }
+.alert-item { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+              gap: 12px; padding: 14px 18px; border-bottom: 1px solid #21262d;
+              border-left: 3px solid transparent; }
+.alert-item:last-child { border-bottom: none; }
+.alert-item.unread { border-left-color: #58a6ff; background: #111923; }
+.alert-item.read { opacity: 0.68; }
+.alert-main { min-width: 0; }
+.alert-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+              color: #8b949e; font-size: 11px; flex-wrap: wrap; }
+.alert-level { border: 1px solid #30363d; border-radius: 10px; padding: 2px 7px;
+               font-weight: 700; text-transform: uppercase; }
+.alert-level.critical { color: #f85149; border-color: #f85149; }
+.alert-level.warning { color: #d29922; border-color: #d29922; }
+.alert-message { line-height: 1.5; overflow-wrap: anywhere; }
+.alert-actions { display: flex; align-items: center; gap: 6px; }
+.alert-empty { color: #8b949e; padding: 18px; text-align: center; }
+.video-btn { width: 100%; margin-top: 14px; padding: 8px 10px;
+             background: #21262d; border: 1px solid #58a6ff;
+             color: #58a6ff; font-size: 12px; }
+.video-btn:hover { background: #111923; }
+.video-unavailable { color: #6e7681; font-size: 11px; margin-top: 14px;
+                     text-align: center; }
+.video-modal { position: fixed; inset: 0; z-index: 1000; padding: 24px;
+               display: grid; place-items: center;
+               background: rgba(1, 4, 9, 0.86); }
+.video-modal[hidden] { display: none; }
+.video-dialog { width: min(960px, 100%); max-height: calc(100vh - 48px);
+                overflow: hidden; padding: 18px; background: #161b22;
+                border: 1px solid #30363d; border-radius: 12px;
+                box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55); }
+.video-head { display: flex; align-items: flex-start; justify-content: space-between;
+              gap: 16px; margin-bottom: 12px; }
+.video-title { font-size: 15px; font-weight: 700; }
+.video-meta { color: #8b949e; font-size: 11px; margin-top: 5px;
+              line-height: 1.5; }
+.video-close { width: auto; margin: 0; padding: 6px 10px;
+               background: #21262d; border: 1px solid #30363d;
+               color: #c9d1d9; font-size: 12px; }
+.video-stage { position: relative; width: 100%; aspect-ratio: 16 / 9;
+               overflow: hidden; background: #010409; border-radius: 8px; }
+.video-player { position: absolute; inset: 0; display: block; width: 100%;
+                height: 100%; object-fit: contain; background: #010409; }
+.video-status { position: absolute; inset: 0; z-index: 2; display: grid;
+                place-items: center; padding: 24px; color: #8b949e;
+                text-align: center; background: #010409; }
+.video-player[hidden], .video-status[hidden] { display: none; }
+@media (max-width: 640px) {
+    body { padding: 14px; }
+    .alert-item { grid-template-columns: 1fr; }
+    .alert-actions { justify-content: flex-end; }
+    .alert-tools { width: 100%; }
+    .node-link { align-items: flex-start; flex-direction: column; gap: 2px; }
+    .node-open { display: none; }
+    .detail-nav { width: 100%; }
+    .node-summaries, .node-summary .grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 641px) and (max-width: 900px) {
+    .node-summaries { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -63,31 +188,79 @@ button { width: 100%; margin-top: 10px; padding: 10px; border: none;
 <div id="app" style="display:none">
   <h1>RL Experiment Supervisor</h1>
   <div class="sub" id="stamp">-</div>
-  <div id="alertbox"></div>
-  <div id="nodes"></div>
-  <div id="rank"></div>
+  <main id="overview">
+    <div id="alertbox"></div>
+    <div id="nodes"></div>
+  </main>
+  <main id="detail" style="display:none">
+    <div id="detailhead"></div>
+    <div id="jobs"></div>
+    <div id="metrics"></div>
+    <div id="charts"></div>
+    <div id="rank"></div>
+  </main>
+</div>
+
+<div id="videoModal" class="video-modal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="videoTitle">
+  <div class="video-dialog">
+    <div class="video-head">
+      <div>
+        <div id="videoTitle" class="video-title">정책 테스트 영상</div>
+        <div id="videoMeta" class="video-meta"></div>
+      </div>
+      <button id="videoClose" class="video-close" type="button" aria-label="영상 닫기">닫기</button>
+    </div>
+    <div class="video-stage">
+      <div id="videoStatus" class="video-status">영상을 준비하고 있습니다.</div>
+      <video id="videoPlayer" class="video-player" controls playsinline
+             preload="metadata" hidden></video>
+    </div>
+  </div>
 </div>
 
 <script>
 // The payload is AES-256-GCM under a PBKDF2-HMAC-SHA256 key, produced by
 // rl_publish.py on the Jetson. Parameters travel with the blob so they can be
 // changed there without editing this page.
+// 600k PBKDF2 iterations is deliberately slow — that is the point on the
+// attacker's side. Re-deriving on every auto-refresh would just burn the
+// viewer's CPU for nothing, so cache per (salt, iterations). The salt only
+// changes when the Jetson re-encrypts with fresh randomness.
+let keyCache = { id: null, key: null };
+let latestEnvelope = null;
+
+function decodeBase64(s) {
+    return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+}
+
+async function decryptionKey(blob, passphrase) {
+    const id = blob.salt + ":" + blob.iterations + ":" + passphrase;
+    let key = keyCache.id === id ? keyCache.key : null;
+
+    if (!key) {
+        const base = await crypto.subtle.importKey(
+            "raw", new TextEncoder().encode(passphrase),
+            "PBKDF2", false, ["deriveKey"]);
+
+        key = await crypto.subtle.deriveKey(
+            { name: "PBKDF2", salt: decodeBase64(blob.salt),
+              iterations: blob.iterations, hash: "SHA-256" },
+            base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+
+        keyCache = { id: id, key: key };
+    }
+    return key;
+}
+
 async function decrypt(blob, passphrase) {
-    const dec = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-
-    const base = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(passphrase),
-        "PBKDF2", false, ["deriveKey"]);
-
-    const key = await crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt: dec(blob.salt),
-          iterations: blob.iterations, hash: "SHA-256" },
-        base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    const key = await decryptionKey(blob, passphrase);
 
     // Python's AESGCM appends the 16-byte tag, which is what AES-GCM decrypt
     // expects by default here.
     const plain = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: dec(blob.iv) }, key, dec(blob.data));
+        { name: "AES-GCM", iv: decodeBase64(blob.iv) },
+        key, decodeBase64(blob.data));
 
     return JSON.parse(new TextDecoder().decode(plain));
 }
@@ -98,6 +271,74 @@ function el(tag, cls, text) {
     if (text !== undefined) n.textContent = text;
     return n;
 }
+
+let videoObjectUrl = null;
+
+function closeRankVideo() {
+    const modal = document.getElementById("videoModal");
+    const player = document.getElementById("videoPlayer");
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    player.hidden = true;
+    if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+    videoObjectUrl = null;
+    modal.hidden = true;
+}
+
+async function openRankVideo(meta, nodeName, rankTitle) {
+    const modal = document.getElementById("videoModal");
+    const status = document.getElementById("videoStatus");
+    const player = document.getElementById("videoPlayer");
+    document.getElementById("videoTitle").textContent =
+        nodeLabel(nodeName) + " · " + rankTitle;
+    document.getElementById("videoMeta").textContent =
+        (meta.checkpoint || "-") + " · " + (meta.scenarios || []).join(" → ");
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+    videoObjectUrl = null;
+    status.textContent = "암호화된 영상을 불러와 복호화하는 중입니다…";
+    status.hidden = false;
+    player.hidden = true;
+    modal.hidden = false;
+
+    try {
+        if (!latestEnvelope) throw new Error("암호화 정보가 없습니다.");
+        const response = await fetch(
+            meta.path + "?v=" + encodeURIComponent(meta.updated_at || ""),
+            { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error("영상 파일을 불러오지 못했습니다 (" + response.status + ")");
+        }
+        const key = await decryptionKey(latestEnvelope, passphrase);
+        const plaintext = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: decodeBase64(meta.iv) },
+            key, await response.arrayBuffer());
+        if (modal.hidden) return;
+        if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+        videoObjectUrl = URL.createObjectURL(
+            new Blob([plaintext], { type: meta.mime || "video/mp4" }));
+        player.src = videoObjectUrl;
+        player.hidden = false;
+        status.hidden = true;
+        player.play().catch(() => {});
+    } catch (error) {
+        status.hidden = false;
+        status.textContent = "영상을 열 수 없습니다: " + error.message;
+    }
+}
+
+document.getElementById("videoClose").onclick = closeRankVideo;
+document.getElementById("videoModal").addEventListener("click", event => {
+    if (event.target.id === "videoModal") closeRankVideo();
+});
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !document.getElementById("videoModal").hidden) {
+        closeRankVideo();
+    }
+});
 
 function row(label, value, cls) {
     const r = el("div", "metric");
@@ -117,135 +358,665 @@ function fmt(v) {
     return v.toFixed(5);
 }
 
+const ALERT_STATE_KEY = "rl-dashboard-alert-state-v1";
+let latestAlertData = null;
+
+function loadAlertState() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(ALERT_STATE_KEY) || "{}");
+        return {
+            read: parsed.read && typeof parsed.read === "object" ? parsed.read : {},
+            deleted: parsed.deleted && typeof parsed.deleted === "object"
+                ? parsed.deleted : {},
+        };
+    } catch (_) {
+        return { read: {}, deleted: {} };
+    }
+}
+
+let alertState = loadAlertState();
+
+function saveAlertState() {
+    // Keep state bounded even if this dashboard runs for years.
+    for (const key of ["read", "deleted"]) {
+        const entries = Object.entries(alertState[key])
+            .sort((a, b) => Number(b[1]) - Number(a[1]))
+            .slice(0, 500);
+        alertState[key] = Object.fromEntries(entries);
+    }
+    try {
+        localStorage.setItem(ALERT_STATE_KEY, JSON.stringify(alertState));
+    } catch (_) {
+        // Private browsing/storage denial should not break monitoring.
+    }
+}
+
+function fallbackAlertId(a) {
+    const source = [a.ts, a.key, a.level, a.message].join("|");
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i++) {
+        hash ^= source.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return "legacy-" + (hash >>> 0).toString(16);
+}
+
+function alertId(a) {
+    return a.id || fallbackAlertId(a);
+}
+
+function alertButton(label, title, onClick, danger) {
+    const button = el("button", "alert-btn" + (danger ? " danger" : ""), label);
+    button.type = "button";
+    button.title = title;
+    button.onclick = onClick;
+    return button;
+}
+
+function rerenderAlerts() {
+    if (latestAlertData) renderAlerts(latestAlertData);
+}
+
 function renderAlerts(data) {
+    latestAlertData = data;
     const box = document.getElementById("alertbox");
     box.textContent = "";
-    const recent = (data.alerts || []).filter(a => a.level !== "resolved").slice(-5);
-    if (!recent.length) return;
-    const card = el("div", "card wide");
-    card.appendChild(el("div", "card-title", "ALERTS"));
-    for (const a of recent) {
-        card.appendChild(row(a.ts_text || "", a.message || "",
-                             a.level === "critical" ? "red" : ""));
+
+    const active = (data.alerts || [])
+        .filter(a => a.level !== "resolved")
+        .slice(-20)
+        .reverse();
+    if (!active.length) return;
+
+    const visible = active.filter(a => !alertState.deleted[alertId(a)]);
+    const unread = visible.filter(a => !alertState.read[alertId(a)]).length;
+    const deleted = active.length - visible.length;
+
+    const card = el("section", "card wide alert-card");
+    const header = el("div", "alert-header");
+    const heading = el("div", "alert-heading");
+    heading.appendChild(el("div", "card-title", "ALERTS"));
+    heading.appendChild(el("span", "alert-count",
+        "안 읽음 " + unread + " · 표시 " + visible.length));
+    header.appendChild(heading);
+
+    const tools = el("div", "alert-tools");
+    if (unread) {
+        tools.appendChild(alertButton("모두 읽음", "표시된 알림을 모두 읽음 처리", () => {
+            const now = Date.now();
+            for (const a of visible) alertState.read[alertId(a)] = now;
+            saveAlertState();
+            rerenderAlerts();
+        }));
     }
+    if (visible.some(a => alertState.read[alertId(a)])) {
+        tools.appendChild(alertButton("읽은 알림 삭제", "읽음 처리한 알림을 화면에서 숨김", () => {
+            const now = Date.now();
+            for (const a of visible) {
+                const id = alertId(a);
+                if (alertState.read[id]) alertState.deleted[id] = now;
+            }
+            saveAlertState();
+            rerenderAlerts();
+        }, true));
+    }
+    if (deleted) {
+        tools.appendChild(alertButton("삭제 복구 " + deleted, "삭제한 알림을 다시 표시", () => {
+            for (const a of active) delete alertState.deleted[alertId(a)];
+            saveAlertState();
+            rerenderAlerts();
+        }));
+    }
+    header.appendChild(tools);
+    card.appendChild(header);
+
+    const list = el("div", "alert-list");
+    if (!visible.length) {
+        list.appendChild(el("div", "alert-empty", "표시할 알림이 없습니다."));
+    }
+
+    for (const a of visible) {
+        const id = alertId(a);
+        const isRead = !!alertState.read[id];
+        const item = el("article", "alert-item " + (isRead ? "read" : "unread"));
+        item.dataset.alertId = id;
+
+        const main = el("div", "alert-main");
+        const meta = el("div", "alert-meta");
+        meta.appendChild(el("span", "alert-level " + (a.level || "warning"),
+                            a.level || "warning"));
+        meta.appendChild(el("span", "", a.ts_text || "시간 미상"));
+        if (isRead) meta.appendChild(el("span", "", "읽음"));
+        main.appendChild(meta);
+        main.appendChild(el("div", "alert-message", a.message || "내용 없음"));
+        item.appendChild(main);
+
+        const actions = el("div", "alert-actions");
+        actions.appendChild(alertButton(
+            isRead ? "안 읽음" : "읽음",
+            isRead ? "이 알림을 안 읽음으로 표시" : "이 알림을 읽음 처리",
+            () => {
+                if (isRead) delete alertState.read[id];
+                else alertState.read[id] = Date.now();
+                saveAlertState();
+                rerenderAlerts();
+            }));
+        actions.appendChild(alertButton("삭제", "이 브라우저에서 알림 숨기기", () => {
+            alertState.deleted[id] = Date.now();
+            saveAlertState();
+            rerenderAlerts();
+        }, true));
+        item.appendChild(actions);
+        list.appendChild(item);
+    }
+    card.appendChild(list);
     box.appendChild(card);
+}
+
+function nodeLabel(name) {
+    const match = String(name).match(/pc[-_ ]?0*(\d+)$/i);
+    return match ? "PC" + Number(match[1]) : name;
+}
+
+function primaryProcess(node) {
+    const processes = ((node || {}).training || {}).processes || [];
+    if (!processes.length) return {};
+
+    const marked = processes.find(p => p && p.primary === true);
+    if (marked) return marked;
+
+    // Rolling upgrades may briefly expose an older worker payload without the
+    // primary marker.  A lower elapsed time is the runner started most
+    // recently, independent of checkpoint numbering or project name.
+    return processes.reduce((best, candidate) => {
+        const bestElapsed = Number(best && best.elapsed_sec);
+        const candidateElapsed = Number(candidate && candidate.elapsed_sec);
+        const b = Number.isFinite(bestElapsed) ? bestElapsed : Infinity;
+        const c = Number.isFinite(candidateElapsed) ? candidateElapsed : Infinity;
+        return c < b ? candidate : best;
+    }, processes[0] || {});
+}
+
+function trainingProcesses(node) {
+    const processes = [...((((node || {}).training || {}).processes) || [])];
+    const primary = primaryProcess(node);
+    return processes.sort((a, b) => {
+        if (a === primary) return -1;
+        if (b === primary) return 1;
+        const ae = Number(a && a.elapsed_sec);
+        const be = Number(b && b.elapsed_sec);
+        return (Number.isFinite(ae) ? ae : Infinity)
+             - (Number.isFinite(be) ? be : Infinity);
+    });
+}
+
+function processItem(process, isPrimary) {
+    const p = process || {};
+    const exp = p.experiment || {};
+    const tb = p.tensorboard_metrics || {};
+    const ck = p.latest_checkpoint || {};
+    const item = el("div", "process-item" + (isPrimary ? " primary" : ""));
+
+    const head = el("div", "process-head");
+    const name = el("div", "process-name", p.project || p.script || "Training process");
+    name.title = p.command || p.project || "";
+    head.appendChild(name);
+    head.appendChild(el(
+        "span", "process-role" + (isPrimary ? " primary" : ""),
+        isPrimary ? "대시보드 추적" : "추가 실행"));
+    item.appendChild(head);
+
+    item.appendChild(row("Experiment", exp.name || "탐지 중", exp.name ? "blue" : ""));
+    item.appendChild(row("PID", p.pid !== undefined ? String(p.pid) : "-"));
+    item.appendChild(row("Runtime", p.elapsed_human || "-"));
+    item.appendChild(row(
+        "Step",
+        tb.current_logged_step !== undefined && tb.current_logged_step !== null
+            ? String(tb.current_logged_step) : "-", "blue"));
+    item.appendChild(row("Checkpoint", ck.name || ck.checkpoint_name || "-"));
+    const sources = tb.sources || {};
+    const sourceNames = [];
+    if (sources.tensorboard) sourceNames.push("TensorBoard");
+    if (sources.training_log) sourceNames.push("Training log");
+    item.appendChild(row("Metrics Source", sourceNames.join(" + ") || "-"));
+    return item;
+}
+
+function visibleMetricNames(metrics, nodeName) {
+    return Object.keys(metrics || {})
+        .filter(name => !(nodeLabel(nodeName) === "PC2" && name.endsWith("/mean")))
+        .sort();
+}
+
+function systemCard(n) {
+    const sys = el("div", "card");
+    sys.appendChild(el("div", "card-title", "SYSTEM"));
+    sys.appendChild(row("Hostname", n.hostname || "-"));
+    sys.appendChild(row("CPU", (n.cpu_percent || 0).toFixed(1) + " %"));
+    sys.appendChild(row("RAM", (n.ram_percent || 0).toFixed(1) + " %"));
+    const g = (n.gpus || [])[0] || {};
+    sys.appendChild(row("GPU", g.name || "-"));
+    sys.appendChild(row("VRAM",
+        g.memory_used !== undefined
+            ? Math.round(g.memory_used) + " / " + Math.round(g.memory_total) + " MiB"
+            : "-"));
+    sys.appendChild(row("GPU Temp",
+        g.temperature !== undefined ? g.temperature + " C" : "-"));
+    return sys;
+}
+
+function trainingCard(n) {
+    const processes = trainingProcesses(n);
+    const primary = primaryProcess(n);
+    const job = el("div", "card training-card" +
+        (processes.length > 1 ? " concurrent" : ""));
+    const title = el("div", "card-title-line");
+    title.appendChild(el("div", "card-title", "TRAINING PROCESSES"));
+    title.appendChild(el("div", "run-count", processes.length + " RUNNING"));
+    job.appendChild(title);
+
+    if (processes.length > 1) {
+        job.appendChild(el(
+            "div", "concurrent-notice",
+            "동일 PC에서 학습 " + processes.length + "개가 동시에 실행 중입니다."));
+    }
+    if (!processes.length) {
+        job.appendChild(el("div", "alert-empty", "실행 중인 학습 프로세스가 없습니다."));
+        return job;
+    }
+
+    const list = el("div", "process-list");
+    for (const process of processes) {
+        list.appendChild(processItem(process, process === primary));
+    }
+    job.appendChild(list);
+    return job;
 }
 
 function renderNodes(data) {
     const host = document.getElementById("nodes");
     host.textContent = "";
+    host.className = "node-summaries";
 
     for (const name of Object.keys(data.status || {}).sort()) {
         const n = data.status[name] || {};
-        const tr = n.training || {};
-        const running = !!tr.running;
+        const running = !!(n.training || {}).running;
+        const processCount = trainingProcesses(n).length;
+        const section = el("section", "node-summary");
 
         const head = el("div", "node-head");
-        head.appendChild(el("div", "node-name", name));
-        head.appendChild(el("div", "badge " + (running ? "on" : "off"),
-                            running ? "RUNNING" : "STOPPED"));
-        host.appendChild(head);
+        const identity = el("div", "node-identity");
+        const link = el("button", "node-link");
+        link.type = "button";
+        link.title = nodeLabel(name) + " 상세 화면 열기";
+        link.setAttribute("aria-label", nodeLabel(name) + " 상세 보기");
+        link.appendChild(el("span", "node-name", nodeLabel(name)));
+        link.appendChild(el("span", "node-source", name));
+        link.appendChild(el("span", "node-open", "상세 보기 →"));
+        link.onclick = () => navigateToNode(name);
+        identity.appendChild(link);
+        const statusClass = processCount > 1 ? "warn" : (running ? "on" : "off");
+        const statusText = running
+            ? "RUNNING · " + processCount + (processCount === 1 ? " JOB" : " JOBS")
+            : "STOPPED";
+        identity.appendChild(el("div", "badge " + statusClass, statusText));
+        head.appendChild(identity);
+        section.appendChild(head);
 
         const grid = el("div", "grid");
-
-        const sys = el("div", "card");
-        sys.appendChild(el("div", "card-title", "SYSTEM"));
-        sys.appendChild(row("Hostname", n.hostname || "-"));
-        sys.appendChild(row("CPU", (n.cpu_percent || 0).toFixed(1) + " %"));
-        sys.appendChild(row("RAM", (n.ram_percent || 0).toFixed(1) + " %"));
-        const g = (n.gpus || [])[0] || {};
-        sys.appendChild(row("GPU", g.name || "-"));
-        sys.appendChild(row("VRAM",
-            g.memory_used !== undefined
-                ? Math.round(g.memory_used) + " / " + Math.round(g.memory_total) + " MiB"
-                : "-"));
-        sys.appendChild(row("GPU Temp",
-            g.temperature !== undefined ? g.temperature + " C" : "-"));
-        grid.appendChild(sys);
-
-        const p = (tr.processes || [])[0] || {};
-        const exp = p.experiment || {};
-        const tb = p.tensorboard_metrics || {};
-
-        const job = el("div", "card");
-        job.appendChild(el("div", "card-title", "TRAINING"));
-        job.appendChild(row("Experiment", exp.name || "-", "blue"));
-        job.appendChild(row("Mode", p.mode || "-"));
-        job.appendChild(row("PID", p.pid !== undefined ? String(p.pid) : "-"));
-        job.appendChild(row("Runtime", p.elapsed_human || "-"));
-        job.appendChild(row("Step",
-            tb.current_logged_step !== undefined && tb.current_logged_step !== null
-                ? String(tb.current_logged_step) : "-", "blue"));
-        const ck = p.latest_checkpoint || {};
-        job.appendChild(row("Checkpoint", ck.checkpoint_name || "-"));
-        grid.appendChild(job);
-
-        const metrics = tb.metrics || {};
-        const names = Object.keys(metrics).sort();
-        if (names.length) {
-            const m = el("div", "card wide");
-            m.appendChild(el("div", "card-title", "TRAINING METRICS " + names.length));
-            const inner = el("div");
-            inner.style.display = "grid";
-            inner.style.gridTemplateColumns =
-                "repeat(auto-fill, minmax(300px, 1fr))";
-            inner.style.gap = "0 28px";
-            for (const k of names) {
-                const v = metrics[k] && metrics[k].value;
-                let cls = "";
-                if (k.indexOf("reward") === 0 && typeof v === "number") {
-                    cls = v >= 0 ? "green" : "red";
-                }
-                inner.appendChild(row(k, fmt(v), cls));
-            }
-            m.appendChild(inner);
-            grid.appendChild(m);
-        }
-
-        host.appendChild(grid);
+        grid.appendChild(systemCard(n));
+        grid.appendChild(trainingCard(n));
+        section.appendChild(grid);
+        host.appendChild(section);
     }
 }
 
-function renderRanking(data) {
+function renderMetrics(data, nodeName) {
+    const host = document.getElementById("metrics");
+    host.textContent = "";
+    const n = (data.status || {})[nodeName] || {};
+    const p = primaryProcess(n);
+    const metrics = (p.tensorboard_metrics || {}).metrics || {};
+    const names = visibleMetricNames(metrics, nodeName);
+
+    const head = el("div", "node-head");
+    head.appendChild(el("div", "node-name", "Training Metrics"));
+    head.appendChild(el("div", "badge", String(names.length)));
+    host.appendChild(head);
+
+    if (!names.length) {
+        host.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
+        return;
+    }
+
+    const card = el("div", "card");
+    const inner = el("div");
+    inner.style.display = "grid";
+    inner.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
+    inner.style.gap = "0 28px";
+    for (const k of names) {
+        const v = metrics[k] && metrics[k].value;
+        let cls = "";
+        if (k.indexOf("reward") === 0 && typeof v === "number") {
+            cls = v >= 0 ? "green" : "red";
+        }
+        inner.appendChild(row(k, fmt(v), cls));
+    }
+    card.appendChild(inner);
+    host.appendChild(card);
+}
+
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function svgEl(tag, attrs) {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+}
+
+// One metric, drawn small. Deliberately dependency-free: a chart library would
+// mean a CDN request from whatever network the viewer is on, and these are
+// simple line plots.
+function sparkline(steps, values, w, h) {
+    const pad = 4;
+    const svg = svgEl("svg", { viewBox: "0 0 " + w + " " + h,
+                               width: "100%", height: h });
+
+    const valid = values.filter(v => typeof v === "number");
+    if (valid.length < 2) return svg;
+
+    let lo = Math.min(...valid), hi = Math.max(...valid);
+    if (hi === lo) { hi = lo + 1; lo = lo - 1; }
+
+    const x0 = steps[0], x1 = steps[steps.length - 1];
+    const span = (x1 - x0) || 1;
+    const px = (s) => pad + (s - x0) / span * (w - 2 * pad);
+    const py = (v) => h - pad - (v - lo) / (hi - lo) * (h - 2 * pad);
+
+    // Zero line, but only when the data actually straddles it — otherwise it
+    // sits on an edge and just adds noise.
+    if (lo < 0 && hi > 0) {
+        svg.appendChild(svgEl("line", {
+            x1: pad, x2: w - pad, y1: py(0), y2: py(0),
+            stroke: "#30363d", "stroke-width": 1 }));
+    }
+
+    // Gaps: a metric that appeared late has leading nulls, and breaking the
+    // path there is more honest than interpolating across them.
+    let d = "", pen = false;
+    for (let i = 0; i < values.length; i++) {
+        const v = values[i];
+        if (typeof v !== "number") { pen = false; continue; }
+        d += (pen ? "L" : "M") + px(steps[i]).toFixed(1) + " "
+             + py(v).toFixed(1) + " ";
+        pen = true;
+    }
+
+    const last = valid[valid.length - 1];
+    svg.appendChild(svgEl("path", {
+        d: d, fill: "none", "stroke-width": 1.5,
+        stroke: last >= 0 ? "#3fb950" : "#f85149" }));
+
+    return svg;
+}
+
+function renderHistory(data, nodeName) {
+    const host = document.getElementById("charts");
+    host.textContent = "";
+    const h = (data.history || {})[nodeName] || {};
+    const steps = h.steps || [];
+    const series = h.series || {};
+    const names = visibleMetricNames(series, nodeName);
+
+    const head = el("div", "node-head");
+    head.appendChild(el("div", "node-name", "Training History"));
+    if (steps.length) {
+        head.appendChild(el("div", "badge",
+            steps[0] + " → " + steps[steps.length - 1]));
+    }
+    host.appendChild(head);
+
+    if (steps.length < 2 || !names.length) {
+        host.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
+        return;
+    }
+
+    const card = el("div", "card");
+    const grid = el("div");
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(260px, 1fr))";
+    grid.style.gap = "18px";
+
+    for (const name of names) {
+        const values = series[name];
+        const valid = values.filter(v => typeof v === "number");
+        if (valid.length < 2) continue;
+
+        const box = el("div");
+        const top = el("div", "metric");
+        top.style.borderBottom = "none";
+        top.style.padding = "0 0 4px";
+        const lab = el("span", "label", name);
+        lab.title = name;
+        const last = valid[valid.length - 1];
+        top.appendChild(lab);
+        top.appendChild(el("span",
+            "value " + (name.indexOf("reward") === 0
+                        ? (last >= 0 ? "green" : "red") : ""),
+            fmt(last)));
+        box.appendChild(top);
+        box.appendChild(sparkline(steps, values, 260, 60));
+        grid.appendChild(box);
+    }
+
+    card.appendChild(grid);
+    host.appendChild(card);
+}
+
+function renderRanking(data, nodeName) {
     const host = document.getElementById("rank");
     host.textContent = "";
-    const r = data.ranking || {};
-    if (!r || r.error || !r.experiment) return;
+    const n = (data.status || {})[nodeName] || {};
+    const p = primaryProcess(n);
+    const experiment = (p.experiment || {}).name;
+    const perNode = (data.rankings || {})[nodeName];
+    const fallback = data.ranking || {};
+    const r = perNode || (fallback.experiment === experiment ? fallback : null);
+    const videos = (data.rank_videos || {})[nodeName] || {};
 
-    host.appendChild(el("div", "node-head")).appendChild(
-        el("div", "node-name", "Checkpoint Ranking"));
+    const head = el("div", "node-head");
+    head.appendChild(el("div", "node-name", "Checkpoint Ranking"));
+    if (experiment) head.appendChild(el("div", "badge", experiment));
+    host.appendChild(head);
+
+    if (!r || r.error || ![r.latest, r.best_reward, r.best_vx_rmse].some(Boolean)) {
+        host.appendChild(el("div", "card empty-card",
+                            "평가가 완료된 체크포인트 랭킹이 없습니다."));
+        return;
+    }
 
     const grid = el("div", "grid");
     const cards = [
-        ["LATEST", r.latest], ["BEST REWARD", r.best_reward],
-        ["BEST VX RMSE", r.best_vx_rmse],
+        ["LATEST", "latest", r.latest],
+        ["BEST REWARD", "best_reward", r.best_reward],
+        ["BEST VX RMSE", "best_vx_rmse", r.best_vx_rmse],
     ];
-    for (const [title, v] of cards) {
+    for (const [title, slot, v] of cards) {
         if (!v) continue;
         const c = el("div", "card");
         c.appendChild(el("div", "card-title", title));
         c.appendChild(row("Checkpoint", v.checkpoint || "-", "blue"));
         c.appendChild(row("Iteration", String(v.iteration)));
-        c.appendChild(row("Reward", fmt(v.reward), "green"));
+        c.appendChild(row("Fixed-eval Reward", fmt(v.reward), "green"));
         c.appendChild(row("VX RMSE", fmt(v.vx_rmse)));
+        if (videos[slot]) {
+            const button = el("button", "video-btn", "테스트 영상 보기");
+            button.type = "button";
+            button.onclick = () => openRankVideo(videos[slot], nodeName, title);
+            c.appendChild(button);
+        } else {
+            c.appendChild(el("div", "video-unavailable", "테스트 영상 준비 중"));
+        }
         grid.appendChild(c);
     }
     host.appendChild(grid);
 }
+
+let latestDashboardData = null;
+const DASHBOARD_REFRESH_MS = 30000;
+let refreshPromise = null;
+
+function selectedNodeFromHash(data) {
+    if (!location.hash.startsWith("#node=")) return null;
+    let name;
+    try {
+        name = decodeURIComponent(location.hash.slice(6));
+    } catch (_) {
+        return null;
+    }
+    return Object.prototype.hasOwnProperty.call(data.status || {}, name) ? name : null;
+}
+
+function navigateToNode(name) {
+    const next = "#node=" + encodeURIComponent(name);
+    if (location.hash === next && latestDashboardData) {
+        renderDashboard(latestDashboardData);
+    } else {
+        location.hash = next;
+    }
+}
+
+function navigateToOverview() {
+    if (location.hash === "#overview" && latestDashboardData) {
+        renderDashboard(latestDashboardData);
+    } else {
+        location.hash = "#overview";
+    }
+}
+
+function renderDetailHead(data, nodeName) {
+    const host = document.getElementById("detailhead");
+    host.textContent = "";
+
+    const toolbar = el("div", "detail-toolbar");
+    const back = el("button", "nav-btn", "← 전체 현황");
+    back.type = "button";
+    back.onclick = navigateToOverview;
+    toolbar.appendChild(back);
+
+    const nav = el("div", "detail-nav");
+    for (const name of Object.keys(data.status || {}).sort()) {
+        const button = el("button", "nav-btn" + (name === nodeName ? " active" : ""),
+                          nodeLabel(name));
+        button.type = "button";
+        button.setAttribute("aria-label", nodeLabel(name) + " 상세 보기");
+        if (name === nodeName) button.setAttribute("aria-current", "page");
+        button.onclick = () => navigateToNode(name);
+        nav.appendChild(button);
+    }
+    toolbar.appendChild(nav);
+    host.appendChild(toolbar);
+
+    const n = (data.status || {})[nodeName] || {};
+    const running = !!(n.training || {}).running;
+    const processCount = trainingProcesses(n).length;
+    const title = el("div", "detail-title");
+    title.appendChild(el("div", "node-name", nodeLabel(nodeName)));
+    title.appendChild(el("div", "node-source", nodeName));
+    title.appendChild(el(
+        "div", "badge " + (processCount > 1 ? "warn" : (running ? "on" : "off")),
+        running
+            ? "RUNNING · " + processCount + (processCount === 1 ? " JOB" : " JOBS")
+            : "STOPPED"));
+    host.appendChild(title);
+}
+
+function renderRunningProcesses(data, nodeName) {
+    const host = document.getElementById("jobs");
+    host.textContent = "";
+    host.className = "process-section";
+
+    const n = (data.status || {})[nodeName] || {};
+    const processes = trainingProcesses(n);
+    const primary = primaryProcess(n);
+
+    const head = el("div", "node-head");
+    head.appendChild(el("div", "node-name", "Running Processes"));
+    head.appendChild(el(
+        "div", "badge " + (processes.length > 1 ? "warn" : ""),
+        String(processes.length)));
+    host.appendChild(head);
+
+    if (!processes.length) {
+        host.appendChild(el("div", "card empty-card", "실행 중인 학습 프로세스가 없습니다."));
+        return;
+    }
+
+    if (processes.length > 1) {
+        host.appendChild(el(
+            "div", "concurrent-notice",
+            "주의: 동일 PC에서 학습 " + processes.length +
+            "개가 동시에 실행 중입니다. 각 PID와 실험명을 확인하세요."));
+    }
+
+    const grid = el("div", "process-grid");
+    for (const process of processes) {
+        grid.appendChild(processItem(process, process === primary));
+    }
+    host.appendChild(grid);
+}
+
+function renderDashboard(data) {
+    latestDashboardData = data;
+    const nodeName = selectedNodeFromHash(data);
+    const overview = document.getElementById("overview");
+    const detail = document.getElementById("detail");
+
+    if (nodeName) {
+        overview.style.display = "none";
+        detail.style.display = "";
+        renderDetailHead(data, nodeName);
+        renderRunningProcesses(data, nodeName);
+        renderMetrics(data, nodeName);
+        renderHistory(data, nodeName);
+        renderRanking(data, nodeName);
+    } else {
+        detail.style.display = "none";
+        overview.style.display = "";
+        renderAlerts(data);
+        renderNodes(data);
+    }
+}
+
+window.addEventListener("hashchange", () => {
+    if (latestDashboardData) renderDashboard(latestDashboardData);
+});
 
 let passphrase = sessionStorage.getItem("rl_pass") || "";
 
 async function load() {
     const res = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("data.json 을 불러오지 못했습니다 (" + res.status + ")");
-    const data = await decrypt(await res.json(), passphrase);
+    const envelope = await res.json();
+    latestEnvelope = envelope;
+    const data = await decrypt(envelope, passphrase);
 
+    const generatedAt = Number(data.generated_at);
+    const ageSeconds = Number.isFinite(generatedAt)
+        ? Math.max(0, Math.round(Date.now() / 1000 - generatedAt)) : null;
     document.getElementById("stamp").textContent =
         "갱신 " + (data.generated_at_text || "-") +
+        (ageSeconds === null ? "" : "  ·  데이터 지연 " + ageSeconds + "초") +
         "  ·  화면 " + new Date().toLocaleTimeString();
-    renderAlerts(data);
-    renderNodes(data);
-    renderRanking(data);
+    renderDashboard(data);
+}
+
+function refreshDashboard() {
+    if (!passphrase || refreshPromise) return refreshPromise;
+    refreshPromise = load()
+        .catch(error => console.error(error))
+        .finally(() => { refreshPromise = null; });
+    return refreshPromise;
 }
 
 async function open_() {
@@ -257,7 +1028,10 @@ async function open_() {
         sessionStorage.setItem("rl_pass", passphrase);
         document.getElementById("gate").style.display = "none";
         document.getElementById("app").style.display = "";
-        setInterval(() => load().catch(e => console.error(e)), 60000);
+        // The publisher runs at most once a minute. Polling every 30 seconds
+        // catches the next deployment quickly, while refreshPromise prevents
+        // overlapping decryptions on slow devices.
+        setInterval(refreshDashboard, DASHBOARD_REFRESH_MS);
     } catch (e) {
         // A wrong passphrase fails the GCM tag check, which lands here.
         err.textContent = "암호가 틀렸거나 데이터를 읽을 수 없습니다.";
@@ -269,6 +1043,14 @@ document.getElementById("go").onclick = open_;
 document.getElementById("pass").addEventListener("keydown", e => {
     if (e.key === "Enter") open_();
 });
+
+// Background tabs throttle timers. Refresh immediately when the dashboard is
+// brought back instead of leaving the last training session visible until the
+// next interval happens to fire.
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshDashboard();
+});
+window.addEventListener("focus", refreshDashboard);
 
 if (passphrase) {
     document.getElementById("pass").value = passphrase;
