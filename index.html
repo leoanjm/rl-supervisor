@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>RL Experiment Supervisor</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+    margin: 0; padding: 24px;
+    background: #0d1117; color: #e6edf3;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+}
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: #8b949e; font-size: 12px; margin-bottom: 20px; }
+.grid { display: grid; gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.card { background: #161b22; border: 1px solid #30363d;
+        border-radius: 10px; padding: 18px; }
+.card-title { color: #8b949e; font-size: 12px; font-weight: 700;
+              letter-spacing: 1px; margin-bottom: 14px; }
+.metric { display: flex; justify-content: space-between; gap: 12px;
+          padding: 7px 0; border-bottom: 1px solid #21262d;
+          align-items: baseline; }
+.metric:last-child { border-bottom: none; }
+.label { color: #8b949e; overflow: hidden; text-overflow: ellipsis;
+         white-space: nowrap; min-width: 0; }
+.value { font-weight: 600; text-align: right; white-space: nowrap; }
+.green { color: #3fb950; } .red { color: #f85149; } .blue { color: #58a6ff; }
+.node-head { display: flex; align-items: center; gap: 12px;
+             margin: 26px 0 14px; flex-wrap: wrap; }
+.node-name { font-size: 18px; font-weight: 700; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 11px;
+         font-weight: 700; border: 1px solid #30363d; }
+.on { color: #3fb950; border-color: #3fb950; }
+.off { color: #f85149; border-color: #f85149; }
+.wide { grid-column: 1 / -1; }
+#gate { max-width: 380px; margin: 12vh auto; }
+input { width: 100%; padding: 10px; border-radius: 8px;
+        border: 1px solid #30363d; background: #0d1117; color: #e6edf3;
+        font-family: inherit; font-size: 14px; }
+button { width: 100%; margin-top: 10px; padding: 10px; border: none;
+         border-radius: 8px; background: #1f6feb; color: #fff;
+         font-family: inherit; font-size: 14px; font-weight: 600;
+         cursor: pointer; }
+#err { color: #f85149; margin-top: 12px; min-height: 18px; }
+#alerts .metric { border-bottom-color: #30363d; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>RL Experiment Supervisor</h1>
+  <div class="sub">데이터는 암호화되어 있습니다. 암호를 입력하세요.</div>
+  <input id="pass" type="password" placeholder="암호" autocomplete="current-password">
+  <button id="go">열기</button>
+  <div id="err"></div>
+</div>
+
+<div id="app" style="display:none">
+  <h1>RL Experiment Supervisor</h1>
+  <div class="sub" id="stamp">-</div>
+  <div id="alertbox"></div>
+  <div id="nodes"></div>
+  <div id="rank"></div>
+</div>
+
+<script>
+// The payload is AES-256-GCM under a PBKDF2-HMAC-SHA256 key, produced by
+// rl_publish.py on the Jetson. Parameters travel with the blob so they can be
+// changed there without editing this page.
+async function decrypt(blob, passphrase) {
+    const dec = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+    const base = await crypto.subtle.importKey(
+        "raw", new TextEncoder().encode(passphrase),
+        "PBKDF2", false, ["deriveKey"]);
+
+    const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: dec(blob.salt),
+          iterations: blob.iterations, hash: "SHA-256" },
+        base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+
+    // Python's AESGCM appends the 16-byte tag, which is what AES-GCM decrypt
+    // expects by default here.
+    const plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: dec(blob.iv) }, key, dec(blob.data));
+
+    return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+}
+
+function row(label, value, cls) {
+    const r = el("div", "metric");
+    const l = el("span", "label", label);
+    l.title = label;
+    r.appendChild(l);
+    r.appendChild(el("span", "value " + (cls || ""), value));
+    return r;
+}
+
+function fmt(v) {
+    if (v === null || v === undefined) return "-";
+    if (typeof v !== "number") return String(v);
+    if (v === 0) return "0.00000";
+    const a = Math.abs(v);
+    if (a >= 10000 || a < 0.0001) return v.toExponential(3);
+    return v.toFixed(5);
+}
+
+function renderAlerts(data) {
+    const box = document.getElementById("alertbox");
+    box.textContent = "";
+    const recent = (data.alerts || []).filter(a => a.level !== "resolved").slice(-5);
+    if (!recent.length) return;
+    const card = el("div", "card wide");
+    card.appendChild(el("div", "card-title", "ALERTS"));
+    for (const a of recent) {
+        card.appendChild(row(a.ts_text || "", a.message || "",
+                             a.level === "critical" ? "red" : ""));
+    }
+    box.appendChild(card);
+}
+
+function renderNodes(data) {
+    const host = document.getElementById("nodes");
+    host.textContent = "";
+
+    for (const name of Object.keys(data.status || {}).sort()) {
+        const n = data.status[name] || {};
+        const tr = n.training || {};
+        const running = !!tr.running;
+
+        const head = el("div", "node-head");
+        head.appendChild(el("div", "node-name", name));
+        head.appendChild(el("div", "badge " + (running ? "on" : "off"),
+                            running ? "RUNNING" : "STOPPED"));
+        host.appendChild(head);
+
+        const grid = el("div", "grid");
+
+        const sys = el("div", "card");
+        sys.appendChild(el("div", "card-title", "SYSTEM"));
+        sys.appendChild(row("Hostname", n.hostname || "-"));
+        sys.appendChild(row("CPU", (n.cpu_percent || 0).toFixed(1) + " %"));
+        sys.appendChild(row("RAM", (n.ram_percent || 0).toFixed(1) + " %"));
+        const g = (n.gpus || [])[0] || {};
+        sys.appendChild(row("GPU", g.name || "-"));
+        sys.appendChild(row("VRAM",
+            g.memory_used !== undefined
+                ? Math.round(g.memory_used) + " / " + Math.round(g.memory_total) + " MiB"
+                : "-"));
+        sys.appendChild(row("GPU Temp",
+            g.temperature !== undefined ? g.temperature + " C" : "-"));
+        grid.appendChild(sys);
+
+        const p = (tr.processes || [])[0] || {};
+        const exp = p.experiment || {};
+        const tb = p.tensorboard_metrics || {};
+
+        const job = el("div", "card");
+        job.appendChild(el("div", "card-title", "TRAINING"));
+        job.appendChild(row("Experiment", exp.name || "-", "blue"));
+        job.appendChild(row("Mode", p.mode || "-"));
+        job.appendChild(row("PID", p.pid !== undefined ? String(p.pid) : "-"));
+        job.appendChild(row("Runtime", p.elapsed_human || "-"));
+        job.appendChild(row("Step",
+            tb.current_logged_step !== undefined && tb.current_logged_step !== null
+                ? String(tb.current_logged_step) : "-", "blue"));
+        const ck = p.latest_checkpoint || {};
+        job.appendChild(row("Checkpoint", ck.checkpoint_name || "-"));
+        grid.appendChild(job);
+
+        const metrics = tb.metrics || {};
+        const names = Object.keys(metrics).sort();
+        if (names.length) {
+            const m = el("div", "card wide");
+            m.appendChild(el("div", "card-title", "TRAINING METRICS " + names.length));
+            const inner = el("div");
+            inner.style.display = "grid";
+            inner.style.gridTemplateColumns =
+                "repeat(auto-fill, minmax(300px, 1fr))";
+            inner.style.gap = "0 28px";
+            for (const k of names) {
+                const v = metrics[k] && metrics[k].value;
+                let cls = "";
+                if (k.indexOf("reward") === 0 && typeof v === "number") {
+                    cls = v >= 0 ? "green" : "red";
+                }
+                inner.appendChild(row(k, fmt(v), cls));
+            }
+            m.appendChild(inner);
+            grid.appendChild(m);
+        }
+
+        host.appendChild(grid);
+    }
+}
+
+function renderRanking(data) {
+    const host = document.getElementById("rank");
+    host.textContent = "";
+    const r = data.ranking || {};
+    if (!r || r.error || !r.experiment) return;
+
+    host.appendChild(el("div", "node-head")).appendChild(
+        el("div", "node-name", "Checkpoint Ranking"));
+
+    const grid = el("div", "grid");
+    const cards = [
+        ["LATEST", r.latest], ["BEST REWARD", r.best_reward],
+        ["BEST VX RMSE", r.best_vx_rmse],
+    ];
+    for (const [title, v] of cards) {
+        if (!v) continue;
+        const c = el("div", "card");
+        c.appendChild(el("div", "card-title", title));
+        c.appendChild(row("Checkpoint", v.checkpoint || "-", "blue"));
+        c.appendChild(row("Iteration", String(v.iteration)));
+        c.appendChild(row("Reward", fmt(v.reward), "green"));
+        c.appendChild(row("VX RMSE", fmt(v.vx_rmse)));
+        grid.appendChild(c);
+    }
+    host.appendChild(grid);
+}
+
+let passphrase = sessionStorage.getItem("rl_pass") || "";
+
+async function load() {
+    const res = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("data.json 을 불러오지 못했습니다 (" + res.status + ")");
+    const data = await decrypt(await res.json(), passphrase);
+
+    document.getElementById("stamp").textContent =
+        "갱신 " + (data.generated_at_text || "-") +
+        "  ·  화면 " + new Date().toLocaleTimeString();
+    renderAlerts(data);
+    renderNodes(data);
+    renderRanking(data);
+}
+
+async function open_() {
+    const err = document.getElementById("err");
+    err.textContent = "복호화 중...";
+    passphrase = document.getElementById("pass").value;
+    try {
+        await load();
+        sessionStorage.setItem("rl_pass", passphrase);
+        document.getElementById("gate").style.display = "none";
+        document.getElementById("app").style.display = "";
+        setInterval(() => load().catch(e => console.error(e)), 60000);
+    } catch (e) {
+        // A wrong passphrase fails the GCM tag check, which lands here.
+        err.textContent = "암호가 틀렸거나 데이터를 읽을 수 없습니다.";
+        sessionStorage.removeItem("rl_pass");
+    }
+}
+
+document.getElementById("go").onclick = open_;
+document.getElementById("pass").addEventListener("keydown", e => {
+    if (e.key === "Enter") open_();
+});
+
+if (passphrase) {
+    document.getElementById("pass").value = passphrase;
+    open_();
+}
+</script>
+</body>
+</html>
