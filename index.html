@@ -705,6 +705,53 @@ function coreMetricValue(metric, value) {
     return fmt(value);
 }
 
+function allMetricNames(metrics, nodeName) {
+    return Object.keys(metrics || {})
+        .filter(name => !(nodeLabel(nodeName) === "PC2" && name.endsWith("/mean")))
+        .sort();
+}
+
+function trainingMetricsCard(metrics, metricEntries, catalog, coreOnly) {
+    const card = el("div", "card");
+    const inner = el("div");
+    inner.style.display = "grid";
+    inner.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
+    inner.style.gap = "0 28px";
+    const metricGroups = {};
+
+    for (const metric of metricEntries) {
+        const k = metric.name;
+        const meta = catalog[k] || {};
+        const group = coreOnly
+            ? metric.group
+            : (meta.group || ("reward" === k.slice(0, 6) ? "reward" : "training"));
+        if (!metricGroups[group]) {
+            const section = el("div");
+            section.style.minWidth = "0";
+            section.appendChild(el("div", "card-title", group));
+            inner.appendChild(section);
+            metricGroups[group] = section;
+        }
+
+        const v = metrics[k] && metrics[k].value;
+        let cls = "";
+        if (k.indexOf("reward") === 0 && typeof v === "number") {
+            cls = v >= 0 ? "green" : "red";
+        }
+        if (metric.format === "status" && typeof v === "number") {
+            cls = v >= 0.5 ? "green" : "red";
+        }
+        const label = coreOnly ? metric.label : (meta.label || k);
+        const value = coreOnly
+            ? coreMetricValue(metric, v)
+            : fmt(v) + (meta.unit ? " " + meta.unit : "");
+        metricGroups[group].appendChild(row(label, value, cls));
+    }
+
+    card.appendChild(inner);
+    return card;
+}
+
 function systemCard(n) {
     const sys = el("div", "card");
     sys.appendChild(el("div", "card-title", "SYSTEM"));
@@ -795,9 +842,12 @@ function renderMetrics(data, nodeName) {
     const p = selectedRunProcess(data, nodeName);
     const metrics = (p.tensorboard_metrics || {}).metrics || {};
     const coreMetrics = selectCoreMetrics(metrics, CORE_SUMMARY_METRICS);
+    const allNames = allMetricNames(metrics, nodeName);
+    const allMetrics = allNames.map(name => ({name: name}));
 
-    const body = collapsibleSection(
-        host, "metrics", "Training Metrics", String(coreMetrics.length));
+    const section = collapsibleSection(
+        host, "metrics", "Training Metrics",
+        coreMetrics.length + " 핵심", allMetrics.length + " 전체");
 
     const contract = p.run_contract || {};
     const statusCard = el("div", "card");
@@ -827,74 +877,60 @@ function renderMetrics(data, nodeName) {
         }
         statusCard.appendChild(el("div", "video-unavailable", "실제 로봇 배포 안전성 검증과는 별개입니다. 적용·복구 승인은 Telegram에서 진행합니다."));
     }
-    body.appendChild(statusCard);
+    section.always.appendChild(statusCard);
 
     if (!coreMetrics.length) {
-        body.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
-        return;
+        section.summary.appendChild(el("div", "card empty-card", "표시할 핵심 트레이닝 매트릭스가 없습니다."));
+    } else {
+        section.summary.appendChild(trainingMetricsCard(
+            metrics, coreMetrics, p.metric_catalog || {}, true));
     }
 
-    const card = el("div", "card");
-    const inner = el("div");
-    inner.style.display = "grid";
-    inner.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
-    inner.style.gap = "0 28px";
-    const metricGroups = {};
-    for (const metric of coreMetrics) {
-        const k = metric.name;
-        const group = metric.group;
-        if (!metricGroups[group]) {
-            const section = el("div");
-            section.style.minWidth = "0";
-            section.appendChild(el("div", "card-title", group));
-            inner.appendChild(section);
-            metricGroups[group] = section;
-        }
-        const v = metrics[k] && metrics[k].value;
-        let cls = "";
-        if (k.indexOf("reward") === 0 && typeof v === "number") {
-            cls = v >= 0 ? "green" : "red";
-        }
-        if (metric.format === "status" && typeof v === "number") {
-            cls = v >= 0.5 ? "green" : "red";
-        }
-        metricGroups[group].appendChild(row(metric.label, coreMetricValue(metric, v), cls));
+    if (!allMetrics.length) {
+        section.full.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
+    } else {
+        section.full.appendChild(trainingMetricsCard(
+            metrics, allMetrics, p.metric_catalog || {}, false));
     }
-    card.appendChild(inner);
-    body.appendChild(card);
 }
 
 const expandedSections = {
-    metrics: sessionStorage.getItem("rl_section_metrics") === "expanded",
-    history: sessionStorage.getItem("rl_section_history") === "expanded"
+    metrics: sessionStorage.getItem("rl_section_metrics_detail") === "expanded",
+    history: sessionStorage.getItem("rl_section_history_detail") === "expanded"
 };
 
-function collapsibleSection(host, key, title, badgeText) {
+function collapsibleSection(host, key, title, summaryBadgeText, fullBadgeText) {
     const head = el("div", "node-head");
     head.appendChild(el("div", "node-name", title));
 
     const actions = el("div", "section-head-actions");
-    if (badgeText) actions.appendChild(el("div", "badge", badgeText));
+    const badge = el("div", "badge");
+    actions.appendChild(badge);
 
-    const body = el("div");
-    body.id = key + "-content";
+    const always = el("div");
+    const summary = el("div");
+    summary.id = key + "-summary";
+    const full = el("div");
+    full.id = key + "-full";
 
     const toggle = el("button", "section-toggle");
     toggle.type = "button";
-    toggle.setAttribute("aria-controls", body.id);
+    toggle.setAttribute("aria-controls", full.id);
 
     function sync() {
         const expanded = expandedSections[key];
-        body.hidden = !expanded;
-        toggle.textContent = expanded ? "숨기기" : "펼치기";
+        summary.hidden = expanded;
+        full.hidden = !expanded;
+        badge.textContent = expanded ? fullBadgeText : summaryBadgeText;
+        toggle.textContent = expanded ? "핵심만 보기" : "전체 펼치기";
         toggle.setAttribute("aria-expanded", String(expanded));
-        toggle.setAttribute("aria-label", title + (expanded ? " 숨기기" : " 펼치기"));
+        toggle.setAttribute("aria-label", title + (expanded ? " 핵심만 보기" : " 전체 펼치기"));
     }
 
     toggle.onclick = () => {
         expandedSections[key] = !expandedSections[key];
         sessionStorage.setItem(
-            "rl_section_" + key,
+            "rl_section_" + key + "_detail",
             expandedSections[key] ? "expanded" : "collapsed");
         sync();
     };
@@ -902,9 +938,11 @@ function collapsibleSection(host, key, title, badgeText) {
     actions.appendChild(toggle);
     head.appendChild(actions);
     host.appendChild(head);
-    host.appendChild(body);
+    host.appendChild(always);
+    host.appendChild(summary);
+    host.appendChild(full);
     sync();
-    return body;
+    return {always: always, summary: summary, full: full};
 }
 
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -972,42 +1010,18 @@ function sparkline(steps, values, w, h) {
     return svg;
 }
 
-function renderHistory(data, nodeName) {
-    const host = document.getElementById("charts");
-    host.textContent = "";
-    const selected = selectedRuns[nodeName];
-    const currentHistory = (data.history || {})[nodeName] || {};
-    const h = selected && selected !== currentHistory.experiment
-        ? ((((data.history || {})._archives || {})[nodeName] || {})[selected] || {})
-        : currentHistory;
-    const steps = h.steps || [];
-    const series = h.series || {};
-    const coreMetrics = selectCoreMetrics(series, CORE_HISTORY_METRICS);
-
-    const historyLabel = steps.length
-        ? (steps.length === 1
-            ? "수집 1점 · " + steps[0]
-            : steps[0] + " → " + steps[steps.length - 1])
-        : "";
-    const body = collapsibleSection(
-        host, "history", "Training History", historyLabel);
-
-    if (!steps.length || !coreMetrics.length) {
-        body.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
-        return;
-    }
-
+function historyChartsCard(h, steps, metricEntries) {
     const card = el("div", "card");
     const grid = el("div");
     grid.style.display = "grid";
     grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(260px, 1fr))";
     grid.style.gap = "18px";
 
-    for (const metric of coreMetrics) {
+    for (const metric of metricEntries) {
         const name = metric.name;
         const points = (h.points || {})[name];
         const plotSteps = points ? points.map(p => p.step) : steps;
-        const values = points ? points.map(p => p.value) : series[name];
+        const values = points ? points.map(p => p.value) : (h.series || {})[name];
         const valid = values.filter(v => typeof v === "number");
         if (!valid.length) continue;
 
@@ -1015,7 +1029,7 @@ function renderHistory(data, nodeName) {
         const top = el("div", "metric");
         top.style.borderBottom = "none";
         top.style.padding = "0 0 4px";
-        const lab = el("span", "label", metric.label);
+        const lab = el("span", "label", metric.label || name);
         lab.title = name;
         const last = valid[valid.length - 1];
         top.appendChild(lab);
@@ -1029,7 +1043,43 @@ function renderHistory(data, nodeName) {
     }
 
     card.appendChild(grid);
-    body.appendChild(card);
+    return card;
+}
+
+function renderHistory(data, nodeName) {
+    const host = document.getElementById("charts");
+    host.textContent = "";
+    const selected = selectedRuns[nodeName];
+    const currentHistory = (data.history || {})[nodeName] || {};
+    const h = selected && selected !== currentHistory.experiment
+        ? ((((data.history || {})._archives || {})[nodeName] || {})[selected] || {})
+        : currentHistory;
+    const steps = h.steps || [];
+    const series = h.series || {};
+    const coreMetrics = selectCoreMetrics(series, CORE_HISTORY_METRICS);
+    const fullMetrics = allMetricNames(series, nodeName).map(name => ({name: name}));
+
+    const rangeLabel = steps.length
+        ? (steps.length === 1
+            ? "수집 1점 · " + steps[0]
+            : steps[0] + " → " + steps[steps.length - 1])
+        : "수집 기록 없음";
+    const section = collapsibleSection(
+        host, "history", "Training History",
+        rangeLabel + " · " + coreMetrics.length + " 핵심",
+        rangeLabel + " · " + fullMetrics.length + " 전체");
+
+    if (!steps.length || !coreMetrics.length) {
+        section.summary.appendChild(el("div", "card empty-card", "표시할 핵심 트레이닝 추이가 없습니다."));
+    } else {
+        section.summary.appendChild(historyChartsCard(h, steps, coreMetrics));
+    }
+
+    if (!steps.length || !fullMetrics.length) {
+        section.full.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
+    } else {
+        section.full.appendChild(historyChartsCard(h, steps, fullMetrics));
+    }
 }
 
 function videoStatusText(node, experiment, checkpoint) {
