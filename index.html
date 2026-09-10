@@ -633,10 +633,76 @@ function processItem(process, isPrimary) {
     return item;
 }
 
-function visibleMetricNames(metrics, nodeName) {
-    return Object.keys(metrics || {})
-        .filter(name => !(nodeLabel(nodeName) === "PC2" && name.endsWith("/mean")))
-        .sort();
+const CORE_SUMMARY_METRICS = [
+    {aliases:["ll reward"], label:"학습 보상", group:"핵심 성능"},
+    {aliases:["linearVel/mean", "linear_velocity/mean"],
+        label:"Linear Velocity Mean", group:"핵심 성능"},
+    {aliases:["fixed_eval/mean_reward"], label:"평가 평균 보상", group:"핵심 성능"},
+    {aliases:["fixed_eval/completion_rate"], label:"전체 평가 성공률",
+        group:"평가 안정성", format:"percent"},
+    {aliases:["fixed_eval/mean_vx_rmse"], label:"평균 속도 오차 (VX RMSE)",
+        group:"명령 추종"},
+    {aliases:["fixed_eval/mean_yaw_rmse"], label:"평균 회전 오차 (Yaw RMSE)",
+        group:"명령 추종"},
+    {aliases:["fixed_eval/straight_completion_rate", "fixed_eval/forward_completion_rate"],
+        label:"직진 성공률", group:"시나리오 성공률", format:"percent"},
+    {aliases:["fixed_eval/backward_completion_rate"], label:"후진 성공률",
+        group:"시나리오 성공률", format:"percent"},
+    {aliases:["fixed_eval/left_turn_completion_rate"], label:"좌회전 성공률",
+        group:"시나리오 성공률", format:"percent"},
+    {aliases:["fixed_eval/right_turn_completion_rate"], label:"우회전 성공률",
+        group:"시나리오 성공률", format:"percent"},
+    {aliases:["fixed_eval/backward_valid"], label:"후진 평가 유효",
+        group:"평가 유효성", format:"status"},
+    {aliases:["fixed_eval/left_turn_valid"], label:"좌회전 평가 유효",
+        group:"평가 유효성", format:"status"},
+    {aliases:["fixed_eval/right_turn_valid"], label:"우회전 평가 유효",
+        group:"평가 유효성", format:"status"},
+    {aliases:["fixed_eval/straight_vx_rmse"], label:"직진 속도 오차 (VX RMSE)",
+        group:"명령 추종"},
+    {aliases:["fixed_eval/backward_vx_rmse"], label:"후진 속도 오차 (VX RMSE)",
+        group:"명령 추종"},
+    {aliases:["fixed_eval/left_turn_yaw_rmse"], label:"좌회전 오차 (Yaw RMSE)",
+        group:"명령 추종"},
+    {aliases:["fixed_eval/right_turn_yaw_rmse"], label:"우회전 오차 (Yaw RMSE)",
+        group:"명령 추종"},
+    {aliases:["dones"], label:"종료 비율 (dones)", group:"평가 안정성", format:"percent"},
+    {aliases:["reward_COTPenalty", "reward_cot"], label:"COT 보상 항",
+        group:"효율 · 안전"},
+    {aliases:["reward_footSlip", "reward_wheel_slip"], label:"바퀴 슬립 보상 항",
+        group:"효율 · 안전"},
+    {aliases:["reward_wheel_load_imbalance"], label:"바퀴 하중 불균형 보상 항",
+        group:"효율 · 안전"}
+];
+
+const CORE_HISTORY_METRICS = [
+    {aliases:["ll reward"], label:"학습 보상"},
+    {aliases:["linearVel/mean", "linear_velocity/mean"], label:"Linear Velocity Mean"},
+    {aliases:["fixed_eval/mean_reward"], label:"평가 평균 보상"},
+    {aliases:["fixed_eval/completion_rate"], label:"평가 성공률", format:"percent"},
+    {aliases:["fixed_eval/mean_vx_rmse", "fixed_eval/straight_vx_rmse",
+              "fixed_eval/backward_vx_rmse"], label:"평가 속도 오차 (VX RMSE)"},
+    {aliases:["fixed_eval/mean_yaw_rmse", "fixed_eval/left_turn_yaw_rmse",
+              "fixed_eval/right_turn_yaw_rmse"], label:"평가 회전 오차 (Yaw RMSE)"},
+    {aliases:["dones"], label:"종료 비율 (dones)", format:"percent"}
+];
+
+function selectCoreMetrics(metrics, definitions) {
+    const source = metrics || {};
+    const selected = [];
+    for (const definition of definitions) {
+        const name = definition.aliases.find(alias =>
+            Object.prototype.hasOwnProperty.call(source, alias));
+        if (name) selected.push(Object.assign({name: name}, definition));
+    }
+    return selected;
+}
+
+function coreMetricValue(metric, value) {
+    if (typeof value !== "number") return fmt(value);
+    if (metric.format === "percent") return (value * 100).toFixed(1) + " %";
+    if (metric.format === "status") return value >= 0.5 ? "통과" : "실패";
+    return fmt(value);
 }
 
 function systemCard(n) {
@@ -728,10 +794,10 @@ function renderMetrics(data, nodeName) {
     const n = (data.status || {})[nodeName] || {};
     const p = selectedRunProcess(data, nodeName);
     const metrics = (p.tensorboard_metrics || {}).metrics || {};
-    const names = visibleMetricNames(metrics, nodeName);
+    const coreMetrics = selectCoreMetrics(metrics, CORE_SUMMARY_METRICS);
 
     const body = collapsibleSection(
-        host, "metrics", "Training Metrics", String(names.length));
+        host, "metrics", "Training Metrics", String(coreMetrics.length));
 
     const contract = p.run_contract || {};
     const statusCard = el("div", "card");
@@ -763,7 +829,7 @@ function renderMetrics(data, nodeName) {
     }
     body.appendChild(statusCard);
 
-    if (!names.length) {
+    if (!coreMetrics.length) {
         body.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
         return;
     }
@@ -773,10 +839,10 @@ function renderMetrics(data, nodeName) {
     inner.style.display = "grid";
     inner.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
     inner.style.gap = "0 28px";
-    const catalog = p.metric_catalog || {};
     const metricGroups = {};
-    for (const k of names) {
-        const group = (catalog[k] || {}).group || ("reward" === k.slice(0, 6) ? "reward" : "training");
+    for (const metric of coreMetrics) {
+        const k = metric.name;
+        const group = metric.group;
         if (!metricGroups[group]) {
             const section = el("div");
             section.style.minWidth = "0";
@@ -789,9 +855,10 @@ function renderMetrics(data, nodeName) {
         if (k.indexOf("reward") === 0 && typeof v === "number") {
             cls = v >= 0 ? "green" : "red";
         }
-        const meta = catalog[k] || {};
-        metricGroups[meta.group || ("reward" === k.slice(0, 6) ? "reward" : "training")]
-            .appendChild(row(meta.label || k, fmt(v) + (meta.unit ? " " + meta.unit : ""), cls));
+        if (metric.format === "status" && typeof v === "number") {
+            cls = v >= 0.5 ? "green" : "red";
+        }
+        metricGroups[group].appendChild(row(metric.label, coreMetricValue(metric, v), cls));
     }
     card.appendChild(inner);
     body.appendChild(card);
@@ -915,7 +982,7 @@ function renderHistory(data, nodeName) {
         : currentHistory;
     const steps = h.steps || [];
     const series = h.series || {};
-    const names = visibleMetricNames(series, nodeName);
+    const coreMetrics = selectCoreMetrics(series, CORE_HISTORY_METRICS);
 
     const historyLabel = steps.length
         ? (steps.length === 1
@@ -925,7 +992,7 @@ function renderHistory(data, nodeName) {
     const body = collapsibleSection(
         host, "history", "Training History", historyLabel);
 
-    if (!steps.length || !names.length) {
+    if (!steps.length || !coreMetrics.length) {
         body.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
         return;
     }
@@ -936,7 +1003,8 @@ function renderHistory(data, nodeName) {
     grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(260px, 1fr))";
     grid.style.gap = "18px";
 
-    for (const name of names) {
+    for (const metric of coreMetrics) {
+        const name = metric.name;
         const points = (h.points || {})[name];
         const plotSteps = points ? points.map(p => p.step) : steps;
         const values = points ? points.map(p => p.value) : series[name];
@@ -947,14 +1015,14 @@ function renderHistory(data, nodeName) {
         const top = el("div", "metric");
         top.style.borderBottom = "none";
         top.style.padding = "0 0 4px";
-        const lab = el("span", "label", name);
+        const lab = el("span", "label", metric.label);
         lab.title = name;
         const last = valid[valid.length - 1];
         top.appendChild(lab);
         top.appendChild(el("span",
             "value " + (name.indexOf("reward") === 0
                         ? (last >= 0 ? "green" : "red") : ""),
-            fmt(last)));
+            coreMetricValue(metric, last)));
         box.appendChild(top);
         box.appendChild(sparkline(plotSteps, values, 260, 60));
         grid.appendChild(box);
