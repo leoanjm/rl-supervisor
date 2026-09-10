@@ -90,6 +90,12 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .nav-btn:hover { background: #30363d; }
 .nav-btn.active { color: #58a6ff; border-color: #58a6ff; background: #111923; }
 .detail-title { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; }
+.section-head-actions { display: flex; align-items: center; gap: 8px; }
+.section-toggle { width: auto; margin: 0; padding: 6px 10px;
+                  border: 1px solid #30363d; background: #21262d;
+                  color: #c9d1d9; font-size: 11px; }
+.section-toggle:hover { background: #30363d; }
+.section-toggle:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
 .empty-card { color: #8b949e; text-align: center; padding: 28px 18px; }
 #gate { max-width: 380px; margin: 12vh auto; }
 input { width: 100%; padding: 10px; border-radius: 8px;
@@ -724,10 +730,8 @@ function renderMetrics(data, nodeName) {
     const metrics = (p.tensorboard_metrics || {}).metrics || {};
     const names = visibleMetricNames(metrics, nodeName);
 
-    const head = el("div", "node-head");
-    head.appendChild(el("div", "node-name", "Training Metrics"));
-    head.appendChild(el("div", "badge", String(names.length)));
-    host.appendChild(head);
+    const body = collapsibleSection(
+        host, "metrics", "Training Metrics", String(names.length));
 
     const contract = p.run_contract || {};
     const statusCard = el("div", "card");
@@ -757,10 +761,10 @@ function renderMetrics(data, nodeName) {
         }
         statusCard.appendChild(el("div", "video-unavailable", "실제 로봇 배포 안전성 검증과는 별개입니다. 적용·복구 승인은 Telegram에서 진행합니다."));
     }
-    host.appendChild(statusCard);
+    body.appendChild(statusCard);
 
     if (!names.length) {
-        host.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
+        body.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
         return;
     }
 
@@ -790,7 +794,50 @@ function renderMetrics(data, nodeName) {
             .appendChild(row(meta.label || k, fmt(v) + (meta.unit ? " " + meta.unit : ""), cls));
     }
     card.appendChild(inner);
-    host.appendChild(card);
+    body.appendChild(card);
+}
+
+const expandedSections = {
+    metrics: sessionStorage.getItem("rl_section_metrics") === "expanded",
+    history: sessionStorage.getItem("rl_section_history") === "expanded"
+};
+
+function collapsibleSection(host, key, title, badgeText) {
+    const head = el("div", "node-head");
+    head.appendChild(el("div", "node-name", title));
+
+    const actions = el("div", "section-head-actions");
+    if (badgeText) actions.appendChild(el("div", "badge", badgeText));
+
+    const body = el("div");
+    body.id = key + "-content";
+
+    const toggle = el("button", "section-toggle");
+    toggle.type = "button";
+    toggle.setAttribute("aria-controls", body.id);
+
+    function sync() {
+        const expanded = expandedSections[key];
+        body.hidden = !expanded;
+        toggle.textContent = expanded ? "숨기기" : "펼치기";
+        toggle.setAttribute("aria-expanded", String(expanded));
+        toggle.setAttribute("aria-label", title + (expanded ? " 숨기기" : " 펼치기"));
+    }
+
+    toggle.onclick = () => {
+        expandedSections[key] = !expandedSections[key];
+        sessionStorage.setItem(
+            "rl_section_" + key,
+            expandedSections[key] ? "expanded" : "collapsed");
+        sync();
+    };
+
+    actions.appendChild(toggle);
+    head.appendChild(actions);
+    host.appendChild(head);
+    host.appendChild(body);
+    sync();
+    return body;
 }
 
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -870,18 +917,16 @@ function renderHistory(data, nodeName) {
     const series = h.series || {};
     const names = visibleMetricNames(series, nodeName);
 
-    const head = el("div", "node-head");
-    head.appendChild(el("div", "node-name", "Training History"));
-    if (steps.length) {
-        head.appendChild(el("div", "badge",
-            steps.length === 1
-                ? "수집 1점 · " + steps[0]
-                : steps[0] + " → " + steps[steps.length - 1]));
-    }
-    host.appendChild(head);
+    const historyLabel = steps.length
+        ? (steps.length === 1
+            ? "수집 1점 · " + steps[0]
+            : steps[0] + " → " + steps[steps.length - 1])
+        : "";
+    const body = collapsibleSection(
+        host, "history", "Training History", historyLabel);
 
     if (!steps.length || !names.length) {
-        host.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
+        body.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
         return;
     }
 
@@ -916,7 +961,7 @@ function renderHistory(data, nodeName) {
     }
 
     card.appendChild(grid);
-    host.appendChild(card);
+    body.appendChild(card);
 }
 
 function videoStatusText(node, experiment, checkpoint) {
