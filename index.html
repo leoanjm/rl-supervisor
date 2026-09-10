@@ -6,179 +6,381 @@
 <meta name="robots" content="noindex, nofollow">
 <title>RL Experiment Supervisor</title>
 <style>
-:root { color-scheme: dark; }
-* { box-sizing: border-box; }
-body {
-    margin: 0; padding: 24px;
-    background: #0d1117; color: #e6edf3;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px;
+:root {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1c2129;
+    --control: #21262d;
+    --control-hover: #30363d;
+    --line: #30363d;
+    --line-soft: #21262d;
+    --ink: #e6edf3;
+    --ink-2: #c9d1d9;
+    --muted: #8b949e;
+    /* Status colors always travel with an icon and a text label: green and
+       amber are not distinguishable for protan/deutan viewers on their own. */
+    --ok: #3fb950;
+    --warn: #d29922;
+    --err: #f85149;
+    --ok-bg: rgba(63, 185, 80, 0.10);
+    --warn-bg: rgba(210, 153, 34, 0.10);
+    --err-bg: rgba(248, 81, 73, 0.10);
+    --ok-line: rgba(63, 185, 80, 0.45);
+    --warn-line: rgba(210, 153, 34, 0.55);
+    --err-line: rgba(248, 81, 73, 0.55);
+    /* Interactive accent, and the single data-series color (never a status). */
+    --accent: #58a6ff;
+    --accent-bg: #111923;
+    --chart: #388bfd;
+    --chart-track: #1f2d45;
+    --sans: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo",
+            "Malgun Gothic", "Noto Sans KR", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-h1 { font-size: 20px; margin: 0 0 4px; }
-.sub { color: #8b949e; font-size: 12px; margin-bottom: 20px; }
-.grid { display: grid; gap: 16px;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.card { background: #161b22; border: 1px solid #30363d;
-        border-radius: 10px; padding: 18px; }
-.card-title { color: #8b949e; font-size: 12px; font-weight: 700;
-              letter-spacing: 1px; margin-bottom: 14px; }
-.metric { display: flex; justify-content: space-between; gap: 12px;
-          padding: 7px 0; border-bottom: 1px solid #21262d;
-          align-items: baseline; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 var(--sans);
+}
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; }
+.mono { font-family: var(--mono); font-size: 0.93em; }
+/* A value that was never collected. Kept visually distinct from a real 0. */
+.na { color: var(--muted); font-style: italic; font-weight: 400; }
+
+.shell { max-width: 1600px; margin: 0 auto; padding: 0 24px; }
+#app[data-view="overview"] .shell { max-width: 1240px; }
+
+/* ---- Header and data-reception status (both screens) ---- */
+.topbar { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px;
+          padding: 18px 0 12px; }
+.topbar h1 { font-size: 18px; }
+.crumb { color: var(--muted); font-size: 13px; }
+.conn-bar { background: var(--bg); }
+#app[data-view="detail"] .conn-bar { position: sticky; top: 0; z-index: 20;
+                                     padding-bottom: 8px; }
+.conn { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px;
+        padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px;
+        background: var(--surface); }
+.conn.ok { border-color: var(--ok-line);
+           background: linear-gradient(var(--ok-bg), var(--ok-bg)), var(--surface); }
+.conn.warn { border-color: var(--warn-line);
+             background: linear-gradient(var(--warn-bg), var(--warn-bg)), var(--surface); }
+.conn.err { border-color: var(--err-line);
+            background: linear-gradient(var(--err-bg), var(--err-bg)), var(--surface); }
+#app[data-view="detail"] .conn { padding: 8px 14px; }
+.conn-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--ink-2);
+             font-size: 13px; }
+.conn-meta b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.conn-meta .age { font-variant-numeric: tabular-nums; }
+.conn-note { flex-basis: 100%; color: var(--ink-2); font-size: 12px; }
+.alert-summary { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 12px;
+                 margin-left: auto; padding: 5px 10px; border: 1px solid var(--line);
+                 border-radius: 8px; background: var(--control); color: var(--ink-2);
+                 font-size: 12px; font-weight: 600; }
+.alert-summary:hover { background: var(--control-hover); }
+
+/* ---- Status tag: icon + text + color ---- */
+.icon { width: 16px; height: 16px; flex: none; }
+.st { display: inline-flex; align-items: center; gap: 6px; font-weight: 700;
+      white-space: nowrap; }
+.st.ok { color: var(--ok); }
+.st.warn { color: var(--warn); }
+.st.err { color: var(--err); }
+.st.unk { color: var(--muted); }
+.st.lg { font-size: 16px; }
+.st.lg .icon { width: 20px; height: 20px; }
+.st.sm { font-size: 12px; font-weight: 600; white-space: normal; }
+.st.sm .icon { width: 14px; height: 14px; }
+.st.pill { padding: 3px 10px; border: 1px solid currentColor; border-radius: 999px;
+           font-size: 12px; }
+.st.pill .icon { width: 14px; height: 14px; }
+.st.pill.ok { background: var(--ok-bg); }
+.st.pill.warn { background: var(--warn-bg); }
+.st.pill.err { background: var(--err-bg); }
+
+/* ---- Shared blocks ---- */
+.section-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px;
+             margin: 28px 0 10px; min-width: 0; }
+.section-h h2 { font-size: 16px; }
+.section-h .sub { min-width: 0; max-width: 100%; overflow: hidden; color: var(--muted);
+                  font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.section-h .tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+                    margin-left: auto; }
+.badge { padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px;
+         color: var(--ink-2); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.btn { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
+       background: var(--control); color: var(--ink-2); font-size: 12px; font-weight: 600; }
+.btn:hover { background: var(--control-hover); }
+.btn.danger { color: #ff7b72; }
+.card { min-width: 0; padding: 14px 16px; background: var(--surface);
+        border: 1px solid var(--line); border-radius: 10px; }
+.empty-card { color: var(--muted); text-align: center; padding: 26px 18px; }
+.card-note { margin: 8px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.note { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px;
+        border-radius: 8px; font-size: 13px; line-height: 1.5; }
+.note .icon { margin-top: 2px; }
+.note.warn { color: var(--warn); background: var(--warn-bg); }
+.note.err { color: var(--err); background: var(--err-bg); }
+.note.info { color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); }
+.metric { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+          min-width: 0; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
 .metric:last-child { border-bottom: none; }
-.label { color: #8b949e; overflow: hidden; text-overflow: ellipsis;
-         white-space: nowrap; min-width: 0; }
-.value { font-weight: 600; text-align: right; white-space: nowrap; }
-.green { color: #3fb950; } .red { color: #f85149; } .blue { color: #58a6ff; }
-.node-head { display: flex; align-items: center; gap: 12px;
-             justify-content: space-between; margin: 26px 0 14px;
-             flex-wrap: wrap; }
-.node-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.node-name { font-size: 18px; font-weight: 700; }
-.node-source { color: #8b949e; font-size: 11px; }
-.node-link { width: auto; margin: 0; padding: 0; border: 0; border-radius: 0;
-             background: transparent; color: inherit; display: flex;
-             align-items: baseline; gap: 9px; text-align: left; }
-.node-link:hover .node-name { color: #58a6ff; }
-.node-link:focus-visible { outline: 2px solid #58a6ff; outline-offset: 5px; }
-.node-open { color: #58a6ff; font-size: 11px; }
-.node-summaries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-                  gap: 20px; align-items: start; }
-.node-summary { min-width: 0; }
-.node-summary .node-head { margin: 20px 0 12px; }
-.node-summary .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.node-summary .card { min-width: 0; padding: 14px; }
-.node-summary .metric { gap: 8px; padding: 6px 0; }
-.node-summary .value { overflow: hidden; text-overflow: ellipsis; }
-.badge { padding: 4px 10px; border-radius: 20px; font-size: 11px;
-         font-weight: 700; border: 1px solid #30363d; }
-.on { color: #3fb950; border-color: #3fb950; }
-.off { color: #f85149; border-color: #f85149; }
-.warn { color: #d29922; border-color: #d29922; }
-.wide { grid-column: 1 / -1; }
-.training-card.concurrent { border-color: #d29922; }
-.card-title-line { display: flex; align-items: center; justify-content: space-between;
-                   gap: 10px; margin-bottom: 12px; }
-.card-title-line .card-title { margin: 0; }
-.run-count { color: #8b949e; font-size: 10px; white-space: nowrap; }
-.concurrent-notice { color: #d29922; background: rgba(210, 153, 34, 0.08);
-                     border: 1px solid rgba(210, 153, 34, 0.45);
-                     border-radius: 7px; padding: 8px 10px; margin-bottom: 10px;
-                     font-size: 11px; line-height: 1.45; }
-.process-list { display: flex; flex-direction: column; gap: 10px; }
-.process-item { min-width: 0; padding: 11px; border: 1px solid #30363d;
-                border-radius: 8px; background: #0d1117; }
-.process-item.primary { border-color: #238636; background: #0d1610; }
-.process-head { display: flex; align-items: center; justify-content: space-between;
-                gap: 8px; margin-bottom: 5px; }
-.process-name { min-width: 0; overflow: hidden; text-overflow: ellipsis;
-                white-space: nowrap; color: #c9d1d9; font-size: 11px;
-                font-weight: 700; }
-.process-role { flex: 0 0 auto; padding: 2px 6px; border: 1px solid #30363d;
-                border-radius: 10px; color: #8b949e; font-size: 9px;
-                font-weight: 700; }
-.process-role.primary { color: #3fb950; border-color: #238636; }
-.process-item .metric { padding: 5px 0; font-size: 11px; }
-.process-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                gap: 12px; }
-.process-section .node-head { margin-top: 18px; }
-.detail-toolbar { display: flex; justify-content: space-between; align-items: center;
-                  gap: 12px; margin: 22px 0 8px; flex-wrap: wrap; }
-.detail-nav { display: flex; gap: 8px; flex-wrap: wrap; }
-.nav-btn { width: auto; margin: 0; padding: 7px 11px; border: 1px solid #30363d;
-           background: #21262d; color: #c9d1d9; font-size: 12px; }
-.nav-btn:hover { background: #30363d; }
-.nav-btn.active { color: #58a6ff; border-color: #58a6ff; background: #111923; }
-.detail-title { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; }
-.section-head-actions { display: flex; align-items: center; gap: 8px; }
-.section-toggle { width: auto; margin: 0; padding: 6px 10px;
-                  border: 1px solid #30363d; background: #21262d;
-                  color: #c9d1d9; font-size: 11px; }
-.section-toggle:hover { background: #30363d; }
-.section-toggle:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
-.empty-card { color: #8b949e; text-align: center; padding: 28px 18px; }
-#gate { max-width: 380px; margin: 12vh auto; }
-input { width: 100%; padding: 10px; border-radius: 8px;
-        border: 1px solid #30363d; background: #0d1117; color: #e6edf3;
-        font-family: inherit; font-size: 14px; }
-button { width: 100%; margin-top: 10px; padding: 10px; border: none;
-         border-radius: 8px; background: #1f6feb; color: #fff;
-         font-family: inherit; font-size: 14px; font-weight: 600;
-         cursor: pointer; }
-#err { color: #f85149; margin-top: 12px; min-height: 18px; }
-.alert-card { padding: 0; overflow: hidden; margin-bottom: 20px; }
-.alert-header { display: flex; align-items: center; justify-content: space-between;
-                gap: 14px; padding: 16px 18px; border-bottom: 1px solid #30363d;
-                flex-wrap: wrap; }
-.alert-heading { display: flex; align-items: center; gap: 10px; }
-.alert-heading .card-title { margin: 0; }
-.alert-count { color: #8b949e; font-size: 11px; }
-.alert-tools { display: flex; gap: 8px; flex-wrap: wrap; }
-.alert-btn { width: auto; margin: 0; padding: 6px 10px; border-radius: 6px;
-             border: 1px solid #30363d; background: #21262d; color: #c9d1d9;
-             font-size: 11px; font-weight: 600; }
-.alert-btn:hover { background: #30363d; }
-.alert-btn.danger { color: #ff7b72; }
-.alert-list { display: flex; flex-direction: column; }
-.alert-item { display: grid; grid-template-columns: minmax(0, 1fr) auto;
-              gap: 12px; padding: 14px 18px; border-bottom: 1px solid #21262d;
-              border-left: 3px solid transparent; }
+.metric .label { min-width: 0; overflow: hidden; color: var(--muted);
+                 text-overflow: ellipsis; white-space: nowrap; }
+.metric .value { min-width: 0; overflow: hidden; font-weight: 600; text-align: right;
+                 text-overflow: ellipsis; white-space: nowrap;
+                 font-variant-numeric: tabular-nums; }
+.metric .value.mono { font-weight: 500; }
+.meter { height: 8px; overflow: hidden; border-radius: 4px; background: var(--chart-track); }
+.meter > i { display: block; height: 100%; border-radius: 4px; background: var(--chart); }
+
+/* ---- Overview: one card per PC ---- */
+.pc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+           gap: 16px; margin-top: 16px; }
+.pc-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 20px;
+           background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.pc-card.warn { border-color: var(--warn-line); }
+.pc-card.err { border-color: var(--err-line); }
+.pc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pc-name { font-size: 24px; font-weight: 800; line-height: 1.1; }
+.pc-host { margin-top: 4px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.pc-state { display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+            min-width: 0; text-align: right; }
+.pc-state .st { white-space: normal; }
+.pc-hb { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pc-exp { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-exp .k { color: var(--muted); font-size: 12px; }
+.pc-exp .v { overflow: hidden; font-family: var(--mono); font-size: 13px;
+             text-overflow: ellipsis; white-space: nowrap; }
+.pc-progress .line { display: flex; justify-content: space-between; align-items: baseline;
+                     gap: 10px; margin-bottom: 8px; }
+.pc-progress .pct { font-size: 32px; font-weight: 700; line-height: 1.1; }
+.pc-progress .pct.na { font-size: 15px; }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px;
+         margin: 0; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { min-width: 0; margin: 0; font-weight: 600; text-align: right;
+            overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.pc-others { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.pc-others .k { color: var(--muted); font-size: 12px; }
+.pc-other { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.pc-other .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-other b { flex: none; font-variant-numeric: tabular-nums; }
+.pc-empty { padding: 4px 0; color: var(--muted); }
+.sys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px;
+       margin: 0; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.sys dt { color: var(--muted); font-size: 12px; }
+.sys dd { margin: 2px 0 0; font-size: 18px; font-weight: 700;
+          font-variant-numeric: tabular-nums; }
+.sys dd .unit { color: var(--muted); font-size: 12px; font-weight: 500; }
+.sys dd .na { font-size: 14px; }
+.sys .meter { height: 4px; margin-top: 6px; }
+.is-stale .pc-progress .pct, .is-stale .facts dd, .is-stale .sys dd,
+.is-stale .strip dd, .is-stale .pc-other b { color: var(--muted); }
+.is-stale .meter > i { background: #3a4a63; }
+.cta { width: 100%; margin-top: auto; padding: 10px; border: 1px solid var(--accent);
+       border-radius: 8px; background: var(--accent-bg); color: var(--accent);
+       font-weight: 700; }
+.cta:hover { background: #16233a; }
+
+/* ---- Alerts ---- */
+.alert-list { overflow: hidden; background: var(--surface); border: 1px solid var(--line);
+              border-radius: 10px; }
+.alert-item { display: grid; grid-template-columns: 116px minmax(0, 1fr) auto; gap: 12px;
+              align-items: start; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
 .alert-item:last-child { border-bottom: none; }
-.alert-item.unread { border-left-color: #58a6ff; background: #111923; }
-.alert-item.read { opacity: 0.68; }
-.alert-main { min-width: 0; }
-.alert-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-              color: #8b949e; font-size: 11px; flex-wrap: wrap; }
-.alert-level { border: 1px solid #30363d; border-radius: 10px; padding: 2px 7px;
-               font-weight: 700; text-transform: uppercase; }
-.alert-level.critical { color: #f85149; border-color: #f85149; }
-.alert-level.warning { color: #d29922; border-color: #d29922; }
+.alert-item.unread { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+.alert-item.read > :not(.alert-actions) { opacity: 0.7; }
+.alert-level { font-size: 13px; text-transform: uppercase; }
 .alert-message { line-height: 1.5; overflow-wrap: anywhere; }
-.alert-actions { display: flex; align-items: center; gap: 6px; }
-.alert-empty { color: #8b949e; padding: 18px; text-align: center; }
-.video-btn { width: 100%; margin-top: 14px; padding: 8px 10px;
-             background: #21262d; border: 1px solid #58a6ff;
-             color: #58a6ff; font-size: 12px; }
-.video-btn:hover { background: #111923; }
-.video-unavailable { color: #6e7681; font-size: 11px; margin-top: 14px;
-                     text-align: center; }
+.alert-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; color: var(--muted);
+              font-size: 12px; }
+.alert-actions { display: flex; gap: 6px; }
+.alert-empty { padding: 18px; color: var(--muted); text-align: center; }
+
+/* ---- Detail: one PC ---- */
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px;
+       background: var(--control); color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.tab:hover { background: var(--control-hover); }
+.tab[aria-current="page"] { border-color: var(--accent); background: var(--accent-bg);
+                            color: var(--accent); }
+.toolbar .sep { width: 1px; height: 22px; margin: 0 4px; background: var(--line); }
+.run-select { display: flex; align-items: center; gap: 8px; min-width: 0; margin-left: auto;
+              color: var(--muted); font-size: 12px; }
+.run-select select { min-width: 0; max-width: 460px; padding: 6px 8px;
+                     border: 1px solid var(--line); border-radius: 6px;
+                     background: var(--control); color: var(--ink); font-size: 13px; }
+.run-note { margin-bottom: 12px; }
+.pc-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px;
+            padding: 12px 16px; background: var(--surface); border: 1px solid var(--line);
+            border-radius: 10px; }
+.pc-strip.warn { border-color: var(--warn-line); }
+.pc-strip.err { border-color: var(--err-line); }
+.pc-strip .ident { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
+.pc-strip .pc-name { font-size: 22px; }
+.pc-strip .st.pill { align-self: center; }
+.pc-strip .note { flex-basis: 100%; }
+.strip { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 0; }
+.strip dt { color: var(--muted); font-size: 11px; }
+.strip dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.detail-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+              gap: 0 16px; align-items: start; }
+.process-list { display: flex; flex-direction: column; gap: 12px; }
+.concurrent-notice { margin-bottom: 12px; }
+.process-item { min-width: 0; padding: 14px 16px; background: var(--surface);
+                border: 1px solid var(--line); border-radius: 10px; }
+.process-item.primary { border-color: rgba(88, 166, 255, 0.45); }
+.process-head { display: flex; align-items: center; justify-content: space-between;
+                gap: 8px; margin-bottom: 6px; }
+.process-name { min-width: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis;
+                white-space: nowrap; }
+.role { flex: none; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px;
+        color: var(--muted); font-size: 11px; font-weight: 700; }
+.role.primary { border-color: rgba(88, 166, 255, 0.6); background: var(--accent-bg);
+                color: var(--accent); }
+.process-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                column-gap: 28px; }
+.process-rows .span { grid-column: 1 / -1; }
+.process-rows .meter { height: 6px; margin: 0 0 6px; }
+.metric-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                 gap: 6px 32px; }
+.metric-group { min-width: 0; }
+.metric-group h3 { margin: 6px 0 2px; color: var(--muted); font-size: 12px; font-weight: 700; }
+
+/* ---- Charts: small multiples, one series each ---- */
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+              gap: 12px; }
+.chart { min-width: 0; margin: 0; padding: 12px 12px 8px; background: var(--surface);
+         border: 1px solid var(--line); border-radius: 10px; }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.chart-label { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: 13px;
+               text-overflow: ellipsis; white-space: nowrap; }
+.chart-last { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart-area { position: relative; margin-top: 6px; }
+.chart-plot { border-radius: 4px; touch-action: pan-y; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-line { fill: none; stroke: var(--chart); stroke-width: 2; stroke-linejoin: round;
+              stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chart-zero { stroke: #484f58; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chart-dot { fill: var(--chart); }
+.chart-end { fill: var(--chart); stroke: var(--surface); stroke-width: 2; }
+.chart-cross line { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chart-cross circle { fill: var(--ink); stroke: var(--surface); stroke-width: 2; }
+.chart-axis, .chart-foot { display: flex; justify-content: space-between; flex-wrap: wrap;
+                           gap: 2px 10px; color: var(--muted); font-size: 11px;
+                           font-variant-numeric: tabular-nums; }
+.chart-readout { position: absolute; top: -2px; padding: 1px 6px; border: 1px solid var(--line);
+                 border-radius: 4px; background: var(--surface-2); color: var(--ink);
+                 font-size: 11px; white-space: nowrap; pointer-events: none;
+                 font-variant-numeric: tabular-nums; }
+.chart-readout:empty { opacity: 0; }
+.chart-data summary { width: max-content; margin-top: 6px; color: var(--muted);
+                      font-size: 11px; cursor: pointer; }
+.chart-table-wrap { max-height: 180px; margin-top: 6px; overflow: auto;
+                    border-top: 1px solid var(--line-soft); }
+.chart-table { width: 100%; border-collapse: collapse; font-size: 12px;
+               font-variant-numeric: tabular-nums; }
+.chart-table th, .chart-table td { padding: 3px 6px; text-align: right;
+                                   border-bottom: 1px solid var(--line-soft); }
+.chart-table th { position: sticky; top: 0; background: var(--surface); color: var(--muted);
+                  font-weight: 600; }
+
+/* ---- Checkpoint ranking: one comparison table ---- */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line);
+              border-radius: 10px; }
+.rank-notice { margin-bottom: 10px; }
+.rank-table { width: 100%; min-width: 620px; border-collapse: collapse; }
+.rank-table th, .rank-table td { padding: 9px 14px; text-align: left; vertical-align: top;
+                                 border-bottom: 1px solid var(--line-soft); }
+.rank-table tbody tr:last-child > * { border-bottom: none; }
+.rank-table thead th { background: #11161d; font-size: 12px; }
+.rank-table thead .desc { display: block; margin-top: 2px; color: var(--muted);
+                          font-weight: 400; }
+.rank-table tbody th { width: 150px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+.rank-table th:first-child { position: sticky; left: 0; background: var(--surface); }
+.rank-table thead th:first-child { background: #11161d; }
+.rank-table td { font-variant-numeric: tabular-nums; }
+.rank-table td.unavailable { vertical-align: middle; border-left: 1px solid var(--line-soft);
+                             border-bottom: none; }
+.rank-table td.unavailable .card-note { max-width: 320px; }
+.rank-cards { display: none; }
+.rank-card-title { font-size: 13px; }
+.rank-cards .card-note { margin: 2px 0 8px; }
+.video-btn { padding: 6px 12px; border: 1px solid var(--accent); border-radius: 6px;
+             background: var(--accent-bg); color: var(--accent); font-size: 12px;
+             font-weight: 700; }
+.video-btn:hover { background: #16233a; }
+
+/* ---- Passphrase gate ---- */
+#gate { max-width: 380px; margin: 12vh auto; padding: 0 16px; }
+#gate h1 { margin-bottom: 4px; font-size: 20px; }
+#gate .sub { margin-bottom: 18px; color: var(--muted); font-size: 13px; }
+#pass { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+        background: var(--bg); color: var(--ink); font-size: 14px; }
+#go { width: 100%; margin-top: 10px; padding: 10px; border: none; border-radius: 8px;
+      background: #1f6feb; color: #fff; font-size: 14px; font-weight: 600; }
+#err { min-height: 18px; margin-top: 12px; color: var(--err); }
+
+/* ---- Test video modal ---- */
 .video-modal { position: fixed; inset: 0; z-index: 1000; padding: 24px;
                display: grid; place-items: center;
                background: rgba(1, 4, 9, 0.86); }
-.video-modal[hidden] { display: none; }
 .video-dialog { width: min(960px, 100%); max-height: calc(100vh - 48px);
-                overflow: hidden; padding: 18px; background: #161b22;
-                border: 1px solid #30363d; border-radius: 12px;
+                overflow: hidden; padding: 18px; background: var(--surface);
+                border: 1px solid var(--line); border-radius: 12px;
                 box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55); }
 .video-head { display: flex; align-items: flex-start; justify-content: space-between;
               gap: 16px; margin-bottom: 12px; }
+.video-head .btn { flex: none; white-space: nowrap; }
 .video-title { font-size: 15px; font-weight: 700; }
-.video-meta { color: #8b949e; font-size: 11px; margin-top: 5px;
-              line-height: 1.5; }
-.video-close { width: auto; margin: 0; padding: 6px 10px;
-               background: #21262d; border: 1px solid #30363d;
-               color: #c9d1d9; font-size: 12px; }
+.video-meta { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5;
+              overflow-wrap: anywhere; }
 .video-stage { position: relative; width: 100%; aspect-ratio: 16 / 9;
                overflow: hidden; background: #010409; border-radius: 8px; }
 .video-player { position: absolute; inset: 0; display: block; width: 100%;
                 height: 100%; object-fit: contain; background: #010409; }
 .video-status { position: absolute; inset: 0; z-index: 2; display: grid;
-                place-items: center; padding: 24px; color: #8b949e;
+                place-items: center; padding: 24px; color: var(--muted);
                 text-align: center; background: #010409; }
-.video-player[hidden], .video-status[hidden] { display: none; }
-@media (max-width: 640px) {
-    body { padding: 14px; }
-    .alert-item { grid-template-columns: 1fr; }
+
+@media (max-width: 1000px) {
+    .detail-top { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+    .shell { padding: 0 14px; }
+    #app[data-view="detail"] .conn-bar { position: static; }
+    .pc-grid { grid-template-columns: minmax(0, 1fr); }
+    .pc-card { padding: 16px; }
+    .sys dd { font-size: 16px; }
+    /* One column: let long values (experiment names, sources) wrap instead of
+       truncating them. */
+    .metric .label { flex: none; max-width: 48%; }
+    .metric .value { white-space: normal; overflow-wrap: anywhere; }
+    .rank-table-wrap { display: none; }
+    .rank-cards { display: grid; gap: 12px; }
+    .alert-summary { margin-left: 0; }
+    .alert-item { grid-template-columns: minmax(0, 1fr); gap: 6px; }
     .alert-actions { justify-content: flex-end; }
-    .alert-tools { width: 100%; }
-    .node-link { align-items: flex-start; flex-direction: column; gap: 2px; }
-    .node-open { display: none; }
-    .detail-nav { width: 100%; }
-    .node-summaries, .node-summary .grid { grid-template-columns: 1fr; }
+    .process-rows { grid-template-columns: minmax(0, 1fr); }
+    .toolbar .sep { display: none; }
+    .run-select { width: 100%; margin-left: 0; }
+    .run-select select { flex: 1; max-width: none; }
 }
-@media (min-width: 641px) and (max-width: 900px) {
-    .node-summaries { grid-template-columns: 1fr; }
-}
+
+.sim-entry { margin: 18px 0; padding: 20px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+.sim-entry-head { display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap }
+.sim-entry-head h2 {margin:0;font-size:18px}.sim-entry p{font-size:13px;color:#8b949e;margin:10px 0}
+.sim-link {display:inline-block;padding:10px 16px;background:#238636;border:1px solid #2ea043;border-radius:6px;color:white;text-decoration:none;font-size:14px}
+.sim-result-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:15px}.sim-result-charts .chart-card{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;min-width:0}
+.sim-result-charts .chart-card h3{font-size:13px;margin:0 0 8px}.sim-result-charts svg{width:100%;height:auto}.sim-result-charts .legend{display:flex;gap:12px;font-size:11px;margin-bottom:8px}.sim-result-charts .legend i{display:inline-block;width:14px;height:3px;margin-right:5px;vertical-align:middle}
+@media(max-width:700px){.sim-result-charts{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -186,25 +388,52 @@ button { width: 100%; margin-top: 10px; padding: 10px; border: none;
 <div id="gate">
   <h1>RL Experiment Supervisor</h1>
   <div class="sub">데이터는 암호화되어 있습니다. 암호를 입력하세요.</div>
-  <input id="pass" type="password" placeholder="암호" autocomplete="current-password">
-  <button id="go">열기</button>
-  <div id="err"></div>
+  <input id="pass" type="password" placeholder="암호" aria-label="암호"
+         autocomplete="current-password">
+  <button id="go" type="button">열기</button>
+  <div id="err" role="alert"></div>
 </div>
 
-<div id="app" style="display:none">
-  <h1>RL Experiment Supervisor</h1>
-  <div class="sub" id="stamp">-</div>
-  <main id="overview">
-    <div id="alertbox"></div>
-    <div id="nodes"></div>
-  </main>
-  <main id="detail" style="display:none">
-    <div id="detailhead"></div>
-    <div id="jobs"></div>
-    <div id="metrics"></div>
-    <div id="charts"></div>
-    <div id="rank"></div>
-  </main>
+<div id="app" style="display:none" data-view="overview">
+  <div class="shell">
+    <header class="topbar">
+      <h1>RL Experiment Supervisor</h1>
+      <span id="crumb" class="crumb">전체 현황</span>
+    </header>
+  </div>
+  <div class="conn-bar">
+    <div class="shell">
+      <section id="conn" class="conn" aria-label="데이터 수신 상태">
+        <span id="connState" role="status"></span>
+        <div class="conn-meta">
+          <span title="서버가 이 데이터를 게시한 시각">데이터 게시
+            <b id="connPublished">-</b> <span id="connAge" class="age"></span></span>
+          <span title="이 브라우저가 서버 응답을 마지막으로 받은 시각">마지막 수신
+            <b id="connLast">-</b></span>
+          <span id="connCycle"></span>
+        </div>
+        <button id="alertSummary" class="alert-summary" type="button"></button>
+        <div id="connNote" class="conn-note" hidden></div>
+      </section>
+    </div>
+  </div>
+  <div class="shell">
+    <main id="overview">
+      <div id="nodes"></div>
+      <div id="alertbox"></div>
+    </main>
+    <main id="detail" style="display:none">
+      <div id="detailhead"></div>
+      <div id="detailstatus"></div>
+      <div class="detail-top">
+        <div id="jobs"></div>
+        <div id="runconfig"></div>
+      </div>
+      <div id="metrics"></div>
+      <div id="charts"></div>
+      <div id="rank"></div>
+    </main>
+  </div>
 </div>
 
 <div id="videoModal" class="video-modal" hidden role="dialog" aria-modal="true"
@@ -215,7 +444,7 @@ button { width: 100%; margin-top: 10px; padding: 10px; border: none;
         <div id="videoTitle" class="video-title">정책 테스트 영상</div>
         <div id="videoMeta" class="video-meta"></div>
       </div>
-      <button id="videoClose" class="video-close" type="button" aria-label="영상 닫기">닫기</button>
+      <button id="videoClose" class="btn" type="button" aria-label="영상 닫기">닫기</button>
     </div>
     <div class="video-stage">
       <div id="videoStatus" class="video-status">영상을 준비하고 있습니다.</div>
@@ -226,6 +455,43 @@ button { width: 100%; margin-top: 10px; padding: 10px; border: none;
 </div>
 
 <script>
+/* Dependency-free SVG charts, shared by the live and encrypted static dashboards. */
+window.BethexCharts = (() => {
+ const NS='http://www.w3.org/2000/svg';
+ function element(tag, attrs={}, text) {const e=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,String(v)));if(text!==undefined)e.textContent=text;return e;}
+ function chart(host, result, title, lines, xy=false) {
+  const rows=(result.series||[]).filter(r=>r.every(Number.isFinite));if(!rows.length)return;
+  const box=document.createElement('div');box.className='chart-card';
+  const heading=document.createElement('h3');heading.textContent=title;box.appendChild(heading);
+  const legend=document.createElement('div');legend.className='legend';
+  lines.forEach(line=>{const item=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=line.color;item.append(swatch,document.createTextNode(line.label));legend.appendChild(item);});box.appendChild(legend);
+  const W=620,H=250,L=52,R=14,T=22,B=35;
+  let xmin=Math.min(...rows.map(r=>r[xy?7:0])),xmax=Math.max(...rows.map(r=>r[xy?7:0]));
+  let vals=rows.flatMap(r=>lines.map(line=>r[line.column]));let ymin=Math.min(0,...vals),ymax=Math.max(0,...vals);
+  if(xmax-xmin<.001)xmax=xmin+1;
+  if(ymax-ymin<.001){ymax+=.5;ymin-=.5;}else{const pad=(ymax-ymin)*.1;ymin-=pad;ymax+=pad;}
+  if(xy){let span=Math.max(xmax-xmin,(ymax-ymin)*(W-L-R)/(H-T-B));let mid=(xmax+xmin)/2;xmin=mid-span/2;xmax=mid+span/2;const yspan=span*(H-T-B)/(W-L-R),ymid=(ymax+ymin)/2;ymin=ymid-yspan/2;ymax=ymid+yspan/2;}
+  const x=v=>L+(v-xmin)/(xmax-xmin)*(W-L-R),y=v=>H-B-(v-ymin)/(ymax-ymin)*(H-T-B);
+  const svg=element('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':title});
+  if(!xy) (result.events||[]).forEach((event,i,all)=>{if(event.t>xmax)return;const end=all[i+1]?.t??xmax;svg.appendChild(element('rect',{x:x(event.t),y:T,width:Math.max(0,x(Math.min(end,xmax))-x(event.t)),height:H-T-B,fill:i%2?'#58a6ff0b':'#ffffff05'}));svg.appendChild(element('text',{x:x(event.t)+3,y:13,fill:'#8b949e','font-size':9},event.name));});
+  for(let i=0;i<=4;i++){const v=ymin+(ymax-ymin)*i/4;svg.appendChild(element('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:'#30363d','stroke-width':.7}));svg.appendChild(element('text',{x:L-7,y:y(v)+4,'text-anchor':'end',fill:'#8b949e','font-size':10},v.toFixed(2)));}
+  for(let i=0;i<=5;i++){const v=xmin+(xmax-xmin)*i/5;svg.appendChild(element('text',{x:x(v),y:H-14,'text-anchor':'middle',fill:'#8b949e','font-size':10},v.toFixed(1)));}
+  lines.forEach(line=>{const d=rows.map((r,i)=>(i?'L':'M')+x(r[xy?7:0]).toFixed(2)+','+y(r[line.column]).toFixed(2)).join(' ');svg.appendChild(element('path',{d,fill:'none',stroke:line.color,'stroke-width':1.7,...(line.dashed?{'stroke-dasharray':'5 3'}:{})}));});
+  svg.appendChild(element('text',{x:W/2,y:H-1,'text-anchor':'middle',fill:'#8b949e','font-size':10},xy?'세계 좌표 X [m]':'시뮬레이션 시간 [s]'));
+  box.appendChild(svg);host.appendChild(box);
+ }
+ function render(host,result,compact=false){host.textContent='';if(!result)return;
+  chart(host,result,'전진 속도 · m/s',[{column:1,color:'#d2a8ff',label:'목표',dashed:true},{column:2,color:'#58a6ff',label:'실제'}]);
+  chart(host,result,'회전 속도 · rad/s',[{column:3,color:'#d2a8ff',label:'목표',dashed:true},{column:4,color:'#3fb950',label:'실제'}]);
+  if(compact)return;
+  chart(host,result,'몸체 기울기 · °',[{column:5,color:'#58a6ff',label:'롤'},{column:6,color:'#f2cc60',label:'피치'}]);
+  chart(host,result,'이동 경로 · Y [m]',[{column:8,color:'#3fb950',label:'실제 경로'}],true);
+  chart(host,result,'바퀴 수직 접촉 하중 · N',[{column:9,color:'#f2cc60',label:result.project==='gogidong'?'왼쪽 뒷바퀴':'왼쪽 보조바퀴'},{column:10,color:'#ff7b72',label:result.project==='gogidong'?'오른쪽 뒷바퀴':'오른쪽 보조바퀴'},{column:11,color:'#58a6ff',label:result.project==='gogidong'?'왼쪽 앞바퀴':'왼쪽 구동바퀴'},{column:12,color:'#3fb950',label:result.project==='gogidong'?'오른쪽 앞바퀴':'오른쪽 구동바퀴'}]);
+ }
+ return {render};
+})();
+
+
 // The payload is AES-256-GCM under a PBKDF2-HMAC-SHA256 key, produced by
 // rl_publish.py on the Jetson. Parameters travel with the blob so they can be
 // changed there without editing this page.
@@ -268,7 +534,19 @@ async function decrypt(blob, passphrase) {
         { name: "AES-GCM", iv: decodeBase64(blob.iv) },
         key, decodeBase64(blob.data));
 
-    return JSON.parse(new TextDecoder().decode(plain));
+    let decoded = new Uint8Array(plain);
+    if (blob.compression === "gzip") {
+        if (typeof DecompressionStream !== "function") {
+            throw new Error("이 브라우저는 압축된 대시보드 데이터를 지원하지 않습니다.");
+        }
+        const stream = new Blob([decoded]).stream()
+            .pipeThrough(new DecompressionStream("gzip"));
+        decoded = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else if (blob.compression) {
+        throw new Error("지원하지 않는 데이터 압축 형식입니다: " + blob.compression);
+    }
+
+    return JSON.parse(new TextDecoder().decode(decoded));
 }
 
 function el(tag, cls, text) {
@@ -276,6 +554,65 @@ function el(tag, cls, text) {
     if (cls) n.className = cls;
     if (text !== undefined) n.textContent = text;
     return n;
+}
+
+// Timers rewrite the header every second; only touch text that changed so
+// assistive tech does not re-announce identical content.
+function setText(node, text) {
+    if (node.textContent !== text) node.textContent = text;
+}
+
+function isNum(v) {
+    return typeof v === "number" && Number.isFinite(v);
+}
+
+const ICON_SHAPES = {
+    ok: [["circle", {cx: 8, cy: 8, r: 6.8}], ["path", {d: "M5 8.3l2 2 4-4.4"}]],
+    warn: [["path", {d: "M8 1.8l6.6 12H1.4z"}], ["path", {d: "M8 6.2v3.4"}],
+           ["circle", {cx: 8, cy: 11.8, r: 0.9, fill: "currentColor", stroke: "none"}]],
+    err: [["circle", {cx: 8, cy: 8, r: 6.8}],
+          ["path", {d: "M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8"}]],
+    stop: [["circle", {cx: 8, cy: 8, r: 6.8}],
+           ["rect", {x: 5.5, y: 5.5, width: 5, height: 5, rx: 0.8,
+                     fill: "currentColor", stroke: "none"}]],
+    unk: [["circle", {cx: 8, cy: 8, r: 6.8, "stroke-dasharray": "2.4 2"}],
+          ["path", {d: "M6.3 6.3a1.8 1.8 0 1 1 2.6 1.6c-.6.3-.9.7-.9 1.4"}],
+          ["circle", {cx: 8, cy: 11.6, r: 0.9, fill: "currentColor", stroke: "none"}]],
+    info: [["circle", {cx: 8, cy: 8, r: 6.8}], ["path", {d: "M8 7.3v4"}],
+           ["circle", {cx: 8, cy: 4.9, r: 0.9, fill: "currentColor", stroke: "none"}]],
+};
+const STATUS_ICONS = { ok: "ok", warn: "warn", err: "err", unk: "unk", info: "info" };
+
+function icon(kind) {
+    const svg = svgEl("svg", {
+        viewBox: "0 0 16 16", class: "icon", "aria-hidden": "true", focusable: "false",
+        fill: "none", stroke: "currentColor", "stroke-width": 1.7,
+        "stroke-linecap": "round", "stroke-linejoin": "round" });
+    for (const [tag, attrs] of ICON_SHAPES[kind] || ICON_SHAPES.unk) {
+        svg.appendChild(svgEl(tag, attrs));
+    }
+    return svg;
+}
+
+// Normal / caution / error are never color alone: each carries a distinct
+// icon shape (check, triangle, cross, dashed "?") plus its text.
+function statusTag(level, text, extra, iconKind) {
+    const tag = el("span", "st " + level + (extra ? " " + extra : ""));
+    tag.appendChild(icon(iconKind || STATUS_ICONS[level] || "unk"));
+    tag.appendChild(el("span", "", text));
+    return tag;
+}
+
+function notice(level, text, extra) {
+    const box = el("div", "note " + level + (extra ? " " + extra : ""));
+    box.appendChild(icon(STATUS_ICONS[level] || "info"));
+    box.appendChild(el("span", "", text));
+    return box;
+}
+
+// A field that was never collected must not look like a measured 0.
+function missing(text) {
+    return el("span", "na", text || "없음");
 }
 
 let videoObjectUrl = null;
@@ -366,7 +703,14 @@ function row(label, value, cls) {
     const l = el("span", "label", label);
     l.title = label;
     r.appendChild(l);
-    r.appendChild(el("span", "value " + (cls || ""), value));
+    const v = el("span", "value " + (cls || ""));
+    if (value instanceof Node) {
+        v.appendChild(value);
+    } else {
+        v.textContent = value;
+        v.title = value;
+    }
+    r.appendChild(v);
     return r;
 }
 
@@ -377,6 +721,53 @@ function fmt(v) {
     const a = Math.abs(v);
     if (a >= 10000 || a < 0.0001) return v.toExponential(3);
     return v.toFixed(5);
+}
+
+function durationText(seconds) {
+    const s = Math.max(0, Math.round(seconds));
+    if (s < 60) return s + "초";
+    if (s < 3600) return Math.floor(s / 60) + "분 " + (s % 60) + "초";
+    return Math.floor(s / 3600) + "시간 " + Math.floor((s % 3600) / 60) + "분";
+}
+
+function ageText(seconds) {
+    return durationText(seconds) + " 전";
+}
+
+// Browser-local HH:MM:SS; the ko-KR locale would otherwise spell out 시/분/초.
+function clockText(ms) {
+    const t = new Date(ms);
+    return [t.getHours(), t.getMinutes(), t.getSeconds()]
+        .map(part => String(part).padStart(2, "0")).join(":");
+}
+
+function percentText(v) {
+    return isNum(v) ? v.toFixed(1) + " %" : null;
+}
+
+function vramAmount(gpu) {
+    if (!isNum(gpu.memory_used)) return null;
+    return Math.round(gpu.memory_used).toLocaleString() +
+        (isNum(gpu.memory_total) ? " / " + Math.round(gpu.memory_total).toLocaleString() : "");
+}
+
+function vramText(gpu) {
+    const amount = vramAmount(gpu);
+    return amount === null ? null : amount + " MiB";
+}
+
+function progressBar(percent, label) {
+    const clamped = Math.max(0, Math.min(100, percent));
+    const bar = el("div", "meter");
+    const fill = el("i");
+    fill.style.width = clamped + "%";
+    bar.appendChild(fill);
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    bar.setAttribute("aria-valuenow", clamped.toFixed(1));
+    bar.setAttribute("aria-label", label);
+    return bar;
 }
 
 const ALERT_STATE_KEY = "rl-dashboard-alert-state-v1";
@@ -427,7 +818,7 @@ function alertId(a) {
 }
 
 function alertButton(label, title, onClick, danger) {
-    const button = el("button", "alert-btn" + (danger ? " danger" : ""), label);
+    const button = el("button", "btn" + (danger ? " danger" : ""), label);
     button.type = "button";
     button.title = title;
     button.onclick = onClick;
@@ -436,6 +827,18 @@ function alertButton(label, title, onClick, danger) {
 
 function rerenderAlerts() {
     if (latestAlertData) renderAlerts(latestAlertData);
+    if (latestDashboardData) renderAlertSummary(latestDashboardData);
+}
+
+function activeAlerts(data) {
+    return (data.alerts || [])
+        .filter(a => a.level !== "resolved")
+        .slice(-20)
+        .reverse();
+}
+
+function alertStatusLevel(level) {
+    return level === "critical" ? "err" : level === "warning" ? "warn" : "unk";
 }
 
 function renderAlerts(data) {
@@ -443,25 +846,20 @@ function renderAlerts(data) {
     const box = document.getElementById("alertbox");
     box.textContent = "";
 
-    const active = (data.alerts || [])
-        .filter(a => a.level !== "resolved")
-        .slice(-20)
-        .reverse();
-    if (!active.length) return;
-
+    const active = activeAlerts(data);
     const visible = active.filter(a => !alertState.deleted[alertId(a)]);
     const unread = visible.filter(a => !alertState.read[alertId(a)]).length;
     const deleted = active.length - visible.length;
 
-    const card = el("section", "card wide alert-card");
-    const header = el("div", "alert-header");
-    const heading = el("div", "alert-heading");
-    heading.appendChild(el("div", "card-title", "ALERTS"));
-    heading.appendChild(el("span", "alert-count",
-        "안 읽음 " + unread + " · 표시 " + visible.length));
-    header.appendChild(heading);
+    const header = el("div", "section-h");
+    header.appendChild(el("h2", "", "알림"));
+    header.appendChild(el("span", "sub", active.length
+        ? "안 읽음 " + unread + " · 표시 " + visible.length
+        : "활성 알림 없음"));
+    box.appendChild(header);
+    if (!active.length) return;
 
-    const tools = el("div", "alert-tools");
+    const tools = el("div", "tools");
     if (unread) {
         tools.appendChild(alertButton("모두 읽음", "표시된 알림을 모두 읽음 처리", () => {
             const now = Date.now();
@@ -489,7 +887,6 @@ function renderAlerts(data) {
         }));
     }
     header.appendChild(tools);
-    card.appendChild(header);
 
     const list = el("div", "alert-list");
     if (!visible.length) {
@@ -499,17 +896,17 @@ function renderAlerts(data) {
     for (const a of visible) {
         const id = alertId(a);
         const isRead = !!alertState.read[id];
+        const level = a.level || "warning";
         const item = el("article", "alert-item " + (isRead ? "read" : "unread"));
         item.dataset.alertId = id;
+        item.appendChild(statusTag(alertStatusLevel(level), level, "alert-level"));
 
         const main = el("div", "alert-main");
-        const meta = el("div", "alert-meta");
-        meta.appendChild(el("span", "alert-level " + (a.level || "warning"),
-                            a.level || "warning"));
-        meta.appendChild(el("span", "", a.ts_text || "시간 미상"));
-        if (isRead) meta.appendChild(el("span", "", "읽음"));
-        main.appendChild(meta);
         main.appendChild(el("div", "alert-message", a.message || "내용 없음"));
+        const meta = el("div", "alert-meta");
+        meta.appendChild(el("span", "", a.ts_text || "시간 미상"));
+        meta.appendChild(el("span", "", isRead ? "읽음" : "안 읽음"));
+        main.appendChild(meta);
         item.appendChild(main);
 
         const actions = el("div", "alert-actions");
@@ -530,8 +927,41 @@ function renderAlerts(data) {
         item.appendChild(actions);
         list.appendChild(item);
     }
-    card.appendChild(list);
-    box.appendChild(card);
+    box.appendChild(list);
+}
+
+function unreadAlertCounts(data) {
+    const counts = { critical: 0, warning: 0, other: 0 };
+    for (const a of activeAlerts(data)) {
+        const id = alertId(a);
+        if (alertState.deleted[id] || alertState.read[id]) continue;
+        const level = a.level || "warning";
+        if (level === "critical" || level === "warning") counts[level]++;
+        else counts.other++;
+    }
+    return counts;
+}
+
+// Visible from both screens, so an unread alert is never hidden behind the
+// detail view.
+function renderAlertSummary(data) {
+    const button = document.getElementById("alertSummary");
+    const counts = unreadAlertCounts(data);
+    const key = [counts.critical, counts.warning, counts.other].join("|");
+    if (button.dataset.key === key) return;
+    button.dataset.key = key;
+    button.textContent = "";
+    const total = counts.critical + counts.warning + counts.other;
+    if (!total) {
+        button.appendChild(el("span", "", "안 읽은 알림 없음"));
+    } else {
+        button.appendChild(el("span", "", "안 읽은 알림"));
+        if (counts.critical) button.appendChild(statusTag("err", "CRITICAL " + counts.critical, "sm"));
+        if (counts.warning) button.appendChild(statusTag("warn", "WARNING " + counts.warning, "sm"));
+        if (counts.other) button.appendChild(statusTag("unk", "기타 " + counts.other, "sm"));
+    }
+    button.setAttribute("aria-label", total
+        ? "안 읽은 알림 " + total + "개 · 알림 목록으로 이동" : "알림 목록으로 이동");
 }
 
 function nodeLabel(name) {
@@ -571,35 +1001,12 @@ function trainingProcesses(node) {
     });
 }
 
-function processItem(process, isPrimary) {
+// Shared by the overview card and the detail process list so both always say
+// the same thing about progress and completion time.
+function progressEstimate(process) {
     const p = process || {};
-    const exp = p.experiment || {};
     const tb = p.tensorboard_metrics || {};
-    const ck = p.latest_checkpoint || {};
-    const item = el("div", "process-item" + (isPrimary ? " primary" : ""));
-
-    const head = el("div", "process-head");
-    const name = el("div", "process-name", p.project || p.script || "Training process");
-    name.title = p.command || p.project || "";
-    head.appendChild(name);
-    head.appendChild(el(
-        "span", "process-role" + (isPrimary ? " primary" : ""),
-        isPrimary ? "대시보드 추적" : "추가 실행"));
-    item.appendChild(head);
-
-    item.appendChild(row("Experiment", exp.name || "탐지 중", exp.name ? "blue" : ""));
-    item.appendChild(row("PID", p.pid !== undefined ? String(p.pid) : "-"));
-    item.appendChild(row("Runtime", p.elapsed_human || "-"));
-    item.appendChild(row(
-        "Step",
-        tb.current_logged_step !== undefined && tb.current_logged_step !== null
-            ? String(tb.current_logged_step) : "-", "blue"));
-    item.appendChild(row("Checkpoint", ck.name || ck.checkpoint_name || "-"));
     const progress = p.training_progress || {};
-    const maximum = progress.max_iterations;
-    item.appendChild(row("최대 iteration", Number.isFinite(maximum) ? maximum.toLocaleString() : "확인 불가"));
-    if (Number.isFinite(progress.progress_percent))
-        item.appendChild(row("학습 진행률", progress.progress_percent.toFixed(1) + " %"));
     // Transport/CDN age is not evidence that the training itself stalled.
     const sampleAge = Number.isFinite(progress.sampled_at)
         ? Math.max(0, Date.now() / 1000 - progress.sampled_at) : null;
@@ -621,20 +1028,79 @@ function processItem(process, isPrimary) {
             finish += " · 갱신 지연";
         }
     }
-    item.appendChild(row("학습 완료까지", eta));
-    item.appendChild(row("예상 완료 시각", finish));
-    if (publicationDelayed) item.appendChild(row("예측 데이터", 
-        Math.floor(sampleAge / 60) + "분 전 수집 · 현재 학습 상태 미확인", "warn"));
+    return {
+        maximum: progress.max_iterations,
+        percent: progress.progress_percent,
+        sampleAge: sampleAge,
+        publicationDelayed: publicationDelayed,
+        eta: eta,
+        finish: finish,
+    };
+}
+
+function stepValue(process) {
+    const step = ((process || {}).tensorboard_metrics || {}).current_logged_step;
+    if (isNum(step)) return step.toLocaleString();
+    return step !== undefined && step !== null ? String(step) : missing();
+}
+
+function processItem(process, isPrimary) {
+    const p = process || {};
+    const exp = p.experiment || {};
+    const tb = p.tensorboard_metrics || {};
+    const ck = p.latest_checkpoint || {};
+    const est = progressEstimate(p);
+    const item = el("article", "process-item" + (isPrimary ? " primary" : ""));
+
+    const head = el("div", "process-head");
+    const name = el("div", "process-name", p.project || p.script || "Training process");
+    name.title = p.command || p.project || "";
+    head.appendChild(name);
+    head.appendChild(el(
+        "span", "role" + (isPrimary ? " primary" : ""),
+        isPrimary ? "대시보드 추적" : "추가 실행"));
+    item.appendChild(head);
+
+    const rows = el("div", "process-rows");
+    const experiment = row("Experiment", exp.name || missing("탐지 중"), exp.name ? "mono" : "");
+    experiment.classList.add("span");
+    rows.appendChild(experiment);
+    if (Number.isFinite(est.percent)) {
+        const progressRow = row("학습 진행률", est.percent.toFixed(1) + " %");
+        progressRow.classList.add("span");
+        progressRow.style.borderBottom = "none";
+        rows.appendChild(progressRow);
+        const bar = progressBar(est.percent, "학습 진행률");
+        bar.classList.add("span");
+        rows.appendChild(bar);
+    }
+    rows.appendChild(row("PID", p.pid !== undefined && p.pid !== null ? String(p.pid) : missing()));
+    rows.appendChild(row("Runtime", p.elapsed_human || missing()));
+    rows.appendChild(row("Step", stepValue(p)));
+    rows.appendChild(row("Checkpoint", ck.name || ck.checkpoint_name || missing(),
+                         ck.name || ck.checkpoint_name ? "mono" : ""));
+    rows.appendChild(row("최대 iteration", Number.isFinite(est.maximum)
+        ? est.maximum.toLocaleString() : missing("확인 불가")));
+    rows.appendChild(row("학습 완료까지", est.eta));
+    rows.appendChild(row("예상 완료 시각", est.finish === "-" ? missing("-") : est.finish));
     const sources = tb.sources || {};
     const sourceNames = [];
     if (sources.tensorboard) sourceNames.push("TensorBoard");
     if (sources.training_log) sourceNames.push("Training log");
-    item.appendChild(row("Metrics Source", sourceNames.join(" + ") || "-"));
+    rows.appendChild(row("Metrics Source", sourceNames.join(" + ") || missing()));
+    if (est.publicationDelayed) {
+        const delayed = row("예측 데이터", statusTag("warn",
+            Math.floor(est.sampleAge / 60) + "분 전 수집 · 현재 학습 상태 미확인", "sm"));
+        delayed.classList.add("span");
+        rows.appendChild(delayed);
+    }
+    item.appendChild(rows);
     return item;
 }
 
 const CORE_SUMMARY_METRICS = [
-    {aliases:["ll reward"], label:"학습 보상", group:"핵심 성능"},
+    {aliases:["ll reward", "Training/reward"], label:"학습 보상", group:"핵심 성능"},
+    {aliases:["Training/mean_episode_return"], label:"평균 에피소드 누적 보상", group:"핵심 성능"},
     {aliases:["linearVel/mean", "linear_velocity/mean"],
         label:"Linear Velocity Mean", group:"핵심 성능"},
     {aliases:["fixed_eval/mean_reward"], label:"평가 평균 보상", group:"핵심 성능"},
@@ -676,7 +1142,8 @@ const CORE_SUMMARY_METRICS = [
 ];
 
 const CORE_HISTORY_METRICS = [
-    {aliases:["ll reward"], label:"학습 보상"},
+    {aliases:["ll reward", "Training/reward"], label:"학습 보상"},
+    {aliases:["Training/mean_episode_return"], label:"평균 에피소드 누적 보상"},
     {aliases:["linearVel/mean", "linear_velocity/mean"], label:"Linear Velocity Mean"},
     {aliases:["fixed_eval/mean_reward"], label:"평가 평균 보상"},
     {aliases:["fixed_eval/completion_rate"], label:"평가 성공률", format:"percent"},
@@ -695,6 +1162,13 @@ function selectCoreMetrics(metrics, definitions) {
             Object.prototype.hasOwnProperty.call(source, alias));
         if (name) selected.push(Object.assign({name: name}, definition));
     }
+    // An unfamiliar trainer can use entirely new metric names. Keep its
+    // telemetry visible without guessing units or relabeling it as a reward.
+    if (!selected.length) {
+        Object.keys(source).sort().slice(0, 6).forEach(name => {
+            selected.push({name: name, label: name, group: "자동 감지 지표"});
+        });
+    }
     return selected;
 }
 
@@ -705,112 +1179,253 @@ function coreMetricValue(metric, value) {
     return fmt(value);
 }
 
-function systemCard(n) {
-    const sys = el("div", "card");
-    sys.appendChild(el("div", "card-title", "SYSTEM"));
-    sys.appendChild(row("Hostname", n.hostname || "-"));
-    sys.appendChild(row("CPU", (n.cpu_percent || 0).toFixed(1) + " %"));
-    sys.appendChild(row("RAM", (n.ram_percent || 0).toFixed(1) + " %"));
-    const g = (n.gpus || [])[0] || {};
-    sys.appendChild(row("GPU", g.name || "-"));
-    sys.appendChild(row("VRAM",
-        g.memory_used !== undefined
-            ? Math.round(g.memory_used) + " / " + Math.round(g.memory_total) + " MiB"
-            : "-"));
-    sys.appendChild(row("GPU Temp",
-        g.temperature !== undefined ? g.temperature + " C" : "-"));
-    return sys;
+function allMetricNames(metrics, nodeName) {
+    return Object.keys(metrics || {})
+        .filter(name => !(nodeLabel(nodeName) === "PC2" && name.endsWith("/mean")))
+        .sort();
 }
 
-function trainingCard(n, uncertain) {
+function trainingMetricsCard(metrics, metricEntries, catalog, coreOnly) {
+    const card = el("div", "card");
+    const inner = el("div", "metric-groups");
+    const metricGroups = {};
+
+    for (const metric of metricEntries) {
+        const k = metric.name;
+        const meta = catalog[k] || {};
+        const group = coreOnly
+            ? metric.group
+            : (meta.group || ("reward" === k.slice(0, 6) ? "reward" : "training"));
+        if (!metricGroups[group]) {
+            const section = el("section", "metric-group");
+            section.appendChild(el("h3", "", group));
+            inner.appendChild(section);
+            metricGroups[group] = section;
+        }
+
+        // Reward terms are signed by design, so the sign is shown as a number,
+        // not as a green/red status. Only pass/fail checks carry a status.
+        const v = metrics[k] && metrics[k].value;
+        const label = coreOnly ? metric.label : (meta.label || k);
+        let value;
+        if (v === null || v === undefined) {
+            value = missing();
+        } else if (metric.format === "status" && typeof v === "number") {
+            value = statusTag(v >= 0.5 ? "ok" : "err", v >= 0.5 ? "통과" : "실패");
+        } else {
+            value = coreOnly
+                ? coreMetricValue(metric, v)
+                : fmt(v) + (meta.unit ? " " + meta.unit : "");
+        }
+        const r = row(label, value);
+        r.firstChild.title = label === k ? k : label + " · " + k;
+        metricGroups[group].appendChild(r);
+    }
+
+    card.appendChild(inner);
+    return card;
+}
+
+function heartbeat(data, name) {
+    const health = (((data.health || {}).nodes || {})[name]) || {};
+    const reported = health.heartbeat_age_sec;
+    if (!isNum(reported)) return null;
+    const generatedAt = Number(data.generated_at);
+    if (!Number.isFinite(generatedAt)) return { age: reported, at: null };
+    return {
+        age: reported + Math.max(0, Date.now() / 1000 - generatedAt),
+        at: (generatedAt - reported) * 1000,
+    };
+}
+
+function heartbeatText(data, name, withClock) {
+    const hb = heartbeat(data, name);
+    if (!hb) return null;
+    return ageText(hb.age) + (withClock && hb.at !== null ? " (" + clockText(hb.at) + ")" : "");
+}
+
+function systemItem(list, label, text, meterPercent, meterLabel, unit) {
+    const box = el("div");
+    box.appendChild(el("dt", "", label));
+    const dd = el("dd");
+    if (text === null) {
+        dd.appendChild(missing());
+    } else {
+        dd.textContent = text;
+        if (unit) dd.appendChild(el("span", "unit", " " + unit));
+    }
+    box.appendChild(dd);
+    if (isNum(meterPercent)) box.appendChild(progressBar(meterPercent, meterLabel || label));
+    list.appendChild(box);
+}
+
+function systemList(n) {
+    const g = (n.gpus || [])[0] || {};
+    const list = el("dl", "sys");
+    systemItem(list, "CPU", percentText(n.cpu_percent), n.cpu_percent, "CPU 사용률");
+    systemItem(list, "RAM", percentText(n.ram_percent), n.ram_percent, "RAM 사용률");
+    const vramShare = isNum(g.memory_used) && isNum(g.memory_total) && g.memory_total > 0
+        ? g.memory_used / g.memory_total * 100 : null;
+    systemItem(list, "VRAM", vramAmount(g), vramShare, "VRAM 사용률", "MiB");
+    systemItem(list, "GPU 온도", isNum(g.temperature) ? g.temperature + " °C" : null);
+    return list;
+}
+
+function nodeCard(data, name) {
+    const n = (data.status || {})[name] || {};
+    const state = nodeState(data, name);
     const processes = trainingProcesses(n);
     const primary = primaryProcess(n);
-    const job = el("div", "card training-card" +
-        (processes.length > 1 ? " concurrent" : ""));
-    const title = el("div", "card-title-line");
-    title.appendChild(el("div", "card-title", "TRAINING PROCESSES"));
-    title.appendChild(el("div", "run-count", processes.length + (uncertain ? " · 마지막 수신 상태" : " RUNNING")));
-    job.appendChild(title);
+    const card = el("section", "pc-card " + state.level + (state.stale ? " is-stale" : ""));
+    card.setAttribute("aria-label", nodeLabel(name) + " 상태");
 
+    const top = el("div", "pc-top");
+    const ident = el("div");
+    ident.appendChild(el("h2", "pc-name", nodeLabel(name)));
+    if (nodeLabel(name) !== name) ident.appendChild(el("div", "pc-host", name));
+    top.appendChild(ident);
+    const side = el("div", "pc-state");
+    side.appendChild(statusTag(state.level, state.text, "lg", state.icon));
+    const hb = heartbeatText(data, name, false);
+    side.appendChild(el("div", "pc-hb", hb ? "하트비트 " + hb : "하트비트 정보 없음"));
+    top.appendChild(side);
+    card.appendChild(top);
+
+    if (state.stale) {
+        card.appendChild(notice(state.level,
+            "아래 값은 마지막으로 받은 값입니다. 현재 상태는 확인되지 않았습니다."));
+    }
     if (processes.length > 1) {
-        job.appendChild(el(
-            "div", "concurrent-notice",
-            "동일 PC에서 학습 " + processes.length + "개가 동시에 실행 중입니다."));
-    }
-    if (!processes.length) {
-        job.appendChild(el("div", "alert-empty", "실행 중인 학습 프로세스가 없습니다."));
-        return job;
+        card.appendChild(notice("warn",
+            "동일 PC에서 학습 " + processes.length + "개가 동시에 실행 중입니다. " +
+            "상세 화면에서 각 PID와 실험명을 확인하세요."));
     }
 
-    const list = el("div", "process-list");
-    for (const process of processes) {
-        list.appendChild(processItem(process, process === primary));
+    if (!processes.length) {
+        card.appendChild(el("div", "pc-empty", "실행 중인 학습 프로세스가 없습니다."));
+    } else {
+        const exp = (primary.experiment || {}).name;
+        const expBox = el("div", "pc-exp");
+        expBox.appendChild(el("span", "k", processes.length > 1 ? "실험 · 대시보드 추적" : "실험"));
+        const expName = el("span", "v" + (exp ? "" : " na"), exp || "탐지 중");
+        expName.title = exp || "";
+        expBox.appendChild(expName);
+        card.appendChild(expBox);
+
+        const est = progressEstimate(primary);
+        const progress = el("div", "pc-progress");
+        const line = el("div", "line");
+        if (Number.isFinite(est.percent)) {
+            line.appendChild(el("span", "pct", est.percent.toFixed(1) + " %"));
+            progress.appendChild(line);
+            progress.appendChild(progressBar(est.percent, nodeLabel(name) + " 학습 진행률"));
+        } else {
+            // No bar at all: an empty track would read as 0 %.
+            line.appendChild(el("span", "pct na", "진행률 없음"));
+            progress.appendChild(line);
+        }
+        card.appendChild(progress);
+
+        const facts = el("dl", "facts");
+        const fact = (label, value) => {
+            facts.appendChild(el("dt", "", label));
+            const dd = el("dd");
+            if (value instanceof Node) dd.appendChild(value);
+            else dd.textContent = value;
+            facts.appendChild(dd);
+        };
+        fact("학습 완료까지", est.eta);
+        fact("예상 완료 시각", est.finish === "-" ? missing("-") : est.finish);
+        fact("Step", stepValue(primary));
+        fact("최대 iteration", Number.isFinite(est.maximum)
+            ? est.maximum.toLocaleString() : missing("확인 불가"));
+        card.appendChild(facts);
+        if (est.publicationDelayed) {
+            card.appendChild(statusTag("warn", "예측 데이터 " + Math.floor(est.sampleAge / 60) +
+                "분 전 수집 · 현재 학습 상태 미확인", "sm"));
+        }
+
+        const others = processes.filter(process => process !== primary);
+        if (others.length) {
+            const box = el("div", "pc-others");
+            box.appendChild(el("span", "k", "추가 실행"));
+            for (const other of others) {
+                const otherEst = progressEstimate(other);
+                const otherLine = el("div", "pc-other");
+                const otherName = ((other || {}).experiment || {}).name;
+                const label = el("span", "mono" + (otherName ? "" : " na"), otherName || "탐지 중");
+                label.title = otherName || "";
+                otherLine.appendChild(label);
+                if (Number.isFinite(otherEst.percent)) {
+                    otherLine.appendChild(el("b", "", otherEst.percent.toFixed(1) + " %"));
+                } else {
+                    otherLine.appendChild(missing("진행률 없음"));
+                }
+                box.appendChild(otherLine);
+            }
+            card.appendChild(box);
+        }
     }
-    job.appendChild(list);
-    return job;
+
+    card.appendChild(systemList(n));
+
+    const open = el("button", "cta", nodeLabel(name) + " 상세 보기 →");
+    open.type = "button";
+    open.dataset.focusKey = "node:" + name;
+    open.onclick = () => navigateToNode(name);
+    card.appendChild(open);
+    return card;
 }
 
 function renderNodes(data) {
     const host = document.getElementById("nodes");
+    // This runs every second; keep keyboard focus on the same control.
+    const active = document.activeElement;
+    const focusKey = active && host.contains(active) ? active.dataset.focusKey : null;
     host.textContent = "";
-    host.className = "node-summaries";
+    host.className = "pc-grid";
 
-    for (const name of Object.keys(data.status || {}).sort()) {
-        const n = data.status[name] || {};
-        const running = !!(n.training || {}).running;
-        const processCount = trainingProcesses(n).length;
-        const section = el("section", "node-summary");
+    const names = Object.keys(data.status || {}).sort();
+    if (!names.length) {
+        host.appendChild(el("div", "card empty-card", "표시할 PC 상태가 없습니다."));
+    }
+    for (const name of names) host.appendChild(nodeCard(data, name));
 
-        const head = el("div", "node-head");
-        const identity = el("div", "node-identity");
-        const link = el("button", "node-link");
-        link.type = "button";
-        link.title = nodeLabel(name) + " 상세 화면 열기";
-        link.setAttribute("aria-label", nodeLabel(name) + " 상세 보기");
-        link.appendChild(el("span", "node-name", nodeLabel(name)));
-        link.appendChild(el("span", "node-source", name));
-        link.appendChild(el("span", "node-open", "상세 보기 →"));
-        link.onclick = () => navigateToNode(name);
-        identity.appendChild(link);
-        const statusClass = nodeAvailability(data, name) || processCount > 1 ? "warn" : (running ? "on" : "off");
-        const statusText = nodeAvailability(data, name) || (running
-            ? "RUNNING · " + processCount + (processCount === 1 ? " JOB" : " JOBS")
-            : "STOPPED");
-        identity.appendChild(el("div", "badge " + statusClass, statusText));
-        head.appendChild(identity);
-        section.appendChild(head);
-
-        const grid = el("div", "grid");
-        grid.appendChild(systemCard(n));
-        grid.appendChild(trainingCard(n, !!nodeAvailability(data, name)));
-        section.appendChild(grid);
-        host.appendChild(section);
+    if (focusKey) {
+        const target = host.querySelector('[data-focus-key="' + CSS.escape(focusKey) + '"]');
+        if (target) target.focus();
     }
 }
 
-function renderMetrics(data, nodeName) {
-    const host = document.getElementById("metrics");
+function renderRunConfig(data, nodeName) {
+    const host = document.getElementById("runconfig");
     host.textContent = "";
-    const n = (data.status || {})[nodeName] || {};
     const p = selectedRunProcess(data, nodeName);
-    const metrics = (p.tensorboard_metrics || {}).metrics || {};
-    const coreMetrics = selectCoreMetrics(metrics, CORE_SUMMARY_METRICS);
 
-    const body = collapsibleSection(
-        host, "metrics", "Training Metrics", String(coreMetrics.length));
+    const head = el("div", "section-h");
+    head.appendChild(el("h2", "", "실행 구성 · 자동 생성"));
+    const experiment = (p.experiment || {}).name;
+    if (experiment) {
+        const sub = el("span", "sub mono", experiment);
+        sub.title = experiment;
+        head.appendChild(sub);
+    }
+    host.appendChild(head);
 
     const contract = p.run_contract || {};
     const statusCard = el("div", "card");
-    statusCard.appendChild(el("div", "card-title", "실행 구성 · 자동 생성"));
-    const stateText = contract.status === "supported" ? "자동 생성 가능" :
-        contract.origin === "training_runtime" ? "어댑터 검증 필요" : "기존 실행 · 명세 없음";
-    statusCard.appendChild(row("호환성", stateText));
-    statusCard.appendChild(el("div", "video-unavailable", contract.reason ||
+    const supported = contract.status === "supported";
+    const needsAdapter = !supported && contract.origin === "training_runtime";
+    const stateText = supported ? "자동 생성 가능" :
+        needsAdapter ? "어댑터 검증 필요" : "기존 실행 · 명세 없음";
+    statusCard.appendChild(row("호환성",
+        statusTag(supported ? "ok" : needsAdapter ? "warn" : "unk", stateText)));
+    statusCard.appendChild(el("p", "card-note", contract.reason ||
         "새 학습부터 실행 명세가 기록됩니다. 기존 학습의 지표와 기록은 유지됩니다."));
     const dims = contract.dimensions || {};
     if (dims.observation != null) statusCard.appendChild(row("관측 / 행동", dims.observation + " / " + dims.action));
-    if (contract.comparison_id) statusCard.appendChild(row("평가 비교 그룹", contract.comparison_id.slice(0, 12)));
-    if (contract.reward_version) statusCard.appendChild(row("리워드 구성 버전", contract.reward_version.slice(0, 12)));
+    if (contract.comparison_id) statusCard.appendChild(row("평가 비교 그룹", contract.comparison_id.slice(0, 12), "mono"));
+    if (contract.reward_version) statusCard.appendChild(row("리워드 구성 버전", contract.reward_version.slice(0, 12), "mono"));
     const repair = p.adapter_repair;
     if (repair) {
         const labels = {QUEUED:"수정 후보 대기", GENERATING:"수정 후보 작성 중",
@@ -819,82 +1434,96 @@ function renderMetrics(data, nodeName) {
             AWAITING_USER_APPROVAL:"검증 통과 · 사용자 승인 대기", APPLIED:"승인된 버전 적용됨",
             ROLLED_BACK:"이전 연결 복구 · 호환성 재확인 필요"};
         statusCard.appendChild(row("어댑터 처리", labels[repair.status] || repair.status || "상태 확인 필요"));
-        if (repair.candidate_id) statusCard.appendChild(row("수정 후보", repair.candidate_id));
-        if (repair.bundle_sha256) statusCard.appendChild(row("후보 버전", repair.bundle_sha256.slice(0, 12)));
-        if (repair.reason) statusCard.appendChild(el("div", "video-unavailable", repair.reason));
+        if (repair.candidate_id) statusCard.appendChild(row("수정 후보", repair.candidate_id, "mono"));
+        if (repair.bundle_sha256) statusCard.appendChild(row("후보 버전", repair.bundle_sha256.slice(0, 12), "mono"));
+        if (repair.reason) statusCard.appendChild(el("p", "card-note", repair.reason));
         for (const [check, result] of Object.entries(repair.checks || {})) {
             statusCard.appendChild(row(check, result));
         }
-        statusCard.appendChild(el("div", "video-unavailable", "실제 로봇 배포 안전성 검증과는 별개입니다. 적용·복구 승인은 Telegram에서 진행합니다."));
+        statusCard.appendChild(el("p", "card-note", "실제 로봇 배포 안전성 검증과는 별개입니다. 적용·복구 승인은 Telegram에서 진행합니다."));
     }
-    body.appendChild(statusCard);
+    host.appendChild(statusCard);
+}
+
+function renderMetrics(data, nodeName) {
+    const host = document.getElementById("metrics");
+    host.textContent = "";
+    const p = selectedRunProcess(data, nodeName);
+    const metrics = (p.tensorboard_metrics || {}).metrics || {};
+    const coreMetrics = selectCoreMetrics(metrics, CORE_SUMMARY_METRICS);
+    const allNames = allMetricNames(metrics, nodeName);
+    const allMetrics = allNames.map(name => ({name: name}));
+
+    const section = collapsibleSection(
+        host, "metrics", "Training Metrics",
+        coreMetrics.length + " 핵심", allMetrics.length + " 전체",
+        (p.experiment || {}).name);
 
     if (!coreMetrics.length) {
-        body.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
-        return;
+        section.summary.appendChild(el("div", "card empty-card", "표시할 핵심 트레이닝 매트릭스가 없습니다."));
+    } else {
+        section.summary.appendChild(trainingMetricsCard(
+            metrics, coreMetrics, p.metric_catalog || {}, true));
     }
 
-    const card = el("div", "card");
-    const inner = el("div");
-    inner.style.display = "grid";
-    inner.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
-    inner.style.gap = "0 28px";
-    const metricGroups = {};
-    for (const metric of coreMetrics) {
-        const k = metric.name;
-        const group = metric.group;
-        if (!metricGroups[group]) {
-            const section = el("div");
-            section.style.minWidth = "0";
-            section.appendChild(el("div", "card-title", group));
-            inner.appendChild(section);
-            metricGroups[group] = section;
+    section.setFullRenderer(full => {
+        if (!allMetrics.length) {
+            full.appendChild(el("div", "card empty-card", "표시할 트레이닝 매트릭스가 없습니다."));
+        } else {
+            full.appendChild(trainingMetricsCard(
+                metrics, allMetrics, p.metric_catalog || {}, false));
         }
-        const v = metrics[k] && metrics[k].value;
-        let cls = "";
-        if (k.indexOf("reward") === 0 && typeof v === "number") {
-            cls = v >= 0 ? "green" : "red";
-        }
-        if (metric.format === "status" && typeof v === "number") {
-            cls = v >= 0.5 ? "green" : "red";
-        }
-        metricGroups[group].appendChild(row(metric.label, coreMetricValue(metric, v), cls));
-    }
-    card.appendChild(inner);
-    body.appendChild(card);
+    });
 }
 
 const expandedSections = {
-    metrics: sessionStorage.getItem("rl_section_metrics") === "expanded",
-    history: sessionStorage.getItem("rl_section_history") === "expanded"
+    metrics: sessionStorage.getItem("rl_section_metrics_detail") === "expanded",
+    history: sessionStorage.getItem("rl_section_history_detail") === "expanded"
 };
 
-function collapsibleSection(host, key, title, badgeText) {
-    const head = el("div", "node-head");
-    head.appendChild(el("div", "node-name", title));
+function collapsibleSection(host, key, title, summaryBadgeText, fullBadgeText, subtitle) {
+    const head = el("div", "section-h");
+    head.appendChild(el("h2", "", title));
+    if (subtitle) {
+        const sub = el("span", "sub mono", subtitle);
+        sub.title = subtitle;
+        head.appendChild(sub);
+    }
 
-    const actions = el("div", "section-head-actions");
-    if (badgeText) actions.appendChild(el("div", "badge", badgeText));
+    const actions = el("div", "tools");
+    const badge = el("span", "badge");
+    actions.appendChild(badge);
 
-    const body = el("div");
-    body.id = key + "-content";
+    const always = el("div");
+    const summary = el("div");
+    summary.id = key + "-summary";
+    const full = el("div");
+    full.id = key + "-full";
 
-    const toggle = el("button", "section-toggle");
+    const toggle = el("button", "btn section-toggle");
     toggle.type = "button";
-    toggle.setAttribute("aria-controls", body.id);
+    toggle.setAttribute("aria-controls", full.id);
+    let fullRenderer = null;
+    let fullRendered = false;
 
     function sync() {
         const expanded = expandedSections[key];
-        body.hidden = !expanded;
-        toggle.textContent = expanded ? "숨기기" : "펼치기";
+        if (expanded && fullRenderer && !fullRendered) {
+            fullRenderer(full);
+            fullRendered = true;
+        }
+        summary.hidden = expanded;
+        full.hidden = !expanded;
+        badge.textContent = expanded ? fullBadgeText : summaryBadgeText;
+        toggle.textContent = expanded ? "핵심만 보기" : "전체 펼치기";
         toggle.setAttribute("aria-expanded", String(expanded));
-        toggle.setAttribute("aria-label", title + (expanded ? " 숨기기" : " 펼치기"));
+        toggle.setAttribute("aria-label", title + (expanded ? " 핵심만 보기" : " 전체 펼치기"));
     }
 
     toggle.onclick = () => {
         expandedSections[key] = !expandedSections[key];
         sessionStorage.setItem(
-            "rl_section_" + key,
+            "rl_section_" + key + "_detail",
             expandedSections[key] ? "expanded" : "collapsed");
         sync();
     };
@@ -902,9 +1531,19 @@ function collapsibleSection(host, key, title, badgeText) {
     actions.appendChild(toggle);
     head.appendChild(actions);
     host.appendChild(head);
-    host.appendChild(body);
+    host.appendChild(always);
+    host.appendChild(summary);
+    host.appendChild(full);
     sync();
-    return body;
+    return {
+        always: always,
+        summary: summary,
+        full: full,
+        setFullRenderer: renderer => {
+            fullRenderer = renderer;
+            sync();
+        }
+    };
 }
 
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -917,59 +1556,227 @@ function svgEl(tag, attrs) {
 
 // One metric, drawn small. Deliberately dependency-free: a chart library would
 // mean a CDN request from whatever network the viewer is on, and these are
-// simple line plots.
-function sparkline(steps, values, w, h) {
-    const pad = 4;
-    const svg = svgEl("svg", { viewBox: "0 0 " + w + " " + h,
-                               width: "100%", height: h });
+// simple line plots. One series per chart, so the line uses a single neutral
+// data color; status colors stay reserved for status.
+const CHART_W = 300, CHART_H = 76, CHART_PAD = 6;
+const openChartTables = new Set();
 
-    const valid = values.filter(v => typeof v === "number");
-    if (!valid.length) return svg;
+function metricChart(metric, steps, values) {
+    const label = metric.label || metric.name;
+    const show = v => coreMetricValue(metric, v);
+    const samples = values.map((value, i) => {
+        const step = steps[i];
+        return { step: step === null || step === undefined || step === "" ? NaN : Number(step),
+                 value: value };
+    });
+    const usable = s => Number.isFinite(s.value) && Number.isFinite(s.step);
+    const valid = samples.filter(usable);
+    if (!valid.length) return null;
 
-    let lo = Math.min(...valid), hi = Math.max(...valid);
+    let lo = Infinity, hi = -Infinity, x0 = Infinity, x1 = -Infinity;
+    for (const s of valid) {
+        lo = Math.min(lo, s.value);
+        hi = Math.max(hi, s.value);
+        x0 = Math.min(x0, s.step);
+        x1 = Math.max(x1, s.step);
+    }
+    const minValue = lo, maxValue = hi;
     if (hi === lo) { hi = lo + 1; lo = lo - 1; }
-
-    const x0 = steps[0], x1 = steps[steps.length - 1];
     const span = x1 - x0;
     const px = span === 0
-        ? () => w / 2
-        : (s) => pad + (s - x0) / span * (w - 2 * pad);
-    const py = (v) => h - pad - (v - lo) / (hi - lo) * (h - 2 * pad);
+        ? () => CHART_W / 2
+        : s => CHART_PAD + (s - x0) / span * (CHART_W - 2 * CHART_PAD);
+    const py = v => CHART_H - CHART_PAD - (v - lo) / (hi - lo) * (CHART_H - 2 * CHART_PAD);
+    const last = valid[valid.length - 1];
+
+    const box = el("figure", "chart");
+    const head = el("figcaption", "chart-head");
+    const title = el("span", "chart-label", label);
+    title.title = label === metric.name ? metric.name : label + " · " + metric.name;
+    head.appendChild(title);
+    head.appendChild(el("span", "chart-last", show(last.value)));
+    box.appendChild(head);
+
+    const svg = svgEl("svg", { viewBox: "0 0 " + CHART_W + " " + CHART_H,
+                               class: "chart-svg", "aria-hidden": "true", focusable: "false" });
 
     // Zero line, but only when the data actually straddles it — otherwise it
     // sits on an edge and just adds noise.
     if (lo < 0 && hi > 0) {
         svg.appendChild(svgEl("line", {
-            x1: pad, x2: w - pad, y1: py(0), y2: py(0),
-            stroke: "#30363d", "stroke-width": 1 }));
+            x1: CHART_PAD, x2: CHART_W - CHART_PAD, y1: py(0), y2: py(0), class: "chart-zero" }));
     }
 
     // Gaps: a metric that appeared late has leading nulls, and breaking the
     // path there is more honest than interpolating across them.
     let d = "", pen = false;
-    for (let i = 0; i < values.length; i++) {
-        const v = values[i];
-        if (typeof v !== "number") { pen = false; continue; }
-        d += (pen ? "L" : "M") + px(steps[i]).toFixed(1) + " "
-             + py(v).toFixed(1) + " ";
+    for (const s of samples) {
+        if (!usable(s)) { pen = false; continue; }
+        d += (pen ? "L" : "M") + px(s.step).toFixed(1) + " " + py(s.value).toFixed(1) + " ";
         pen = true;
     }
+    svg.appendChild(svgEl("path", { d: d, class: "chart-line" }));
 
-    const last = valid[valid.length - 1];
-    svg.appendChild(svgEl("path", {
-        d: d, fill: "none", "stroke-width": 1.5,
-        stroke: last >= 0 ? "#3fb950" : "#f85149" }));
+    // A resumed or already-completed run may be observed only once, and a
+    // sample between two gaps has no segment to sit on. Show such real samples
+    // as points instead of claiming there is no history.
+    samples.forEach((s, i) => {
+        if (!usable(s)) return;
+        const joined = (i > 0 && usable(samples[i - 1])) ||
+                       (i < samples.length - 1 && usable(samples[i + 1]));
+        if (!joined) {
+            svg.appendChild(svgEl("circle", {
+                cx: px(s.step), cy: py(s.value), r: 3, class: "chart-dot" }));
+        }
+    });
+    svg.appendChild(svgEl("circle", {
+        cx: px(last.step), cy: py(last.value), r: 4, class: "chart-end" }));
 
-    // A resumed or already-completed run may be observed only once. Show the
-    // real sample as a point instead of claiming there is no history.
-    for (let index = 0; index < values.length; index++) {
-        if (!Number.isFinite(values[index])) continue;
-        svg.appendChild(svgEl("circle", {
-            cx: px(steps[index]), cy: py(values[index]), r: 1.5,
-            fill: last >= 0 ? "#3fb950" : "#f85149" }));
+    const cross = svgEl("g", { class: "chart-cross", visibility: "hidden" });
+    const crossLine = svgEl("line", { y1: 0, y2: CHART_H });
+    const crossDot = svgEl("circle", { r: 4 });
+    cross.appendChild(crossLine);
+    cross.appendChild(crossDot);
+    svg.appendChild(cross);
+
+    const plot = el("div", "chart-plot");
+    plot.tabIndex = 0;
+    plot.setAttribute("role", "img");
+    plot.setAttribute("aria-label", label + " 추이 · step " + x0.toLocaleString() + "–" +
+        x1.toLocaleString() + " · " + valid.length + "개 값 · 최소 " + show(minValue) +
+        " · 최대 " + show(maxValue) + " · 마지막 " + show(last.value) +
+        " · 좌우 방향키로 값 확인");
+    plot.appendChild(svg);
+    const area = el("div", "chart-area");
+    area.appendChild(plot);
+    box.appendChild(area);
+
+    const axis = el("div", "chart-axis");
+    axis.appendChild(el("span", "", "step " + x0.toLocaleString()));
+    axis.appendChild(el("span", "", valid.length === 1 ? "수집 1점" : x1.toLocaleString()));
+    box.appendChild(axis);
+
+    const foot = el("div", "chart-foot");
+    foot.appendChild(el("span", "", minValue === maxValue
+        ? (valid.length === 1 ? "값 " : "모든 값 ") + show(minValue)
+        : "최소 " + show(minValue) + " · 최대 " + show(maxValue)));
+    box.appendChild(foot);
+
+    // The readout floats over the plot so showing or clearing it never moves
+    // the layout (a shift between mousedown and mouseup swallows clicks). It is
+    // a sibling of the role="img" plot so assistive tech still hears it.
+    const readout = el("span", "chart-readout");
+    readout.setAttribute("aria-live", "polite");
+    area.appendChild(readout);
+
+    // Crosshair: snaps to the nearest real sample; same readout on keyboard.
+    let cursor = -1;
+    function showAt(index) {
+        if (index < 0) {
+            cross.setAttribute("visibility", "hidden");
+            readout.textContent = "";
+            return;
+        }
+        const s = valid[index];
+        crossLine.setAttribute("x1", px(s.step));
+        crossLine.setAttribute("x2", px(s.step));
+        crossDot.setAttribute("cx", px(s.step));
+        crossDot.setAttribute("cy", py(s.value));
+        cross.setAttribute("visibility", "visible");
+        readout.textContent = "step " + s.step.toLocaleString() + " · " + show(s.value);
+        // Sit on the side away from the crosshair.
+        const onLeft = px(s.step) > CHART_W / 2;
+        readout.style.left = onLeft ? "0" : "auto";
+        readout.style.right = onLeft ? "auto" : "0";
+    }
+    plot.addEventListener("pointermove", event => {
+        const rect = svg.getBoundingClientRect();
+        if (!rect.width) return;
+        const x = (event.clientX - rect.left) / rect.width * CHART_W;
+        let best = 0, bestDistance = Infinity;
+        valid.forEach((s, i) => {
+            const distance = Math.abs(px(s.step) - x);
+            if (distance < bestDistance) { bestDistance = distance; best = i; }
+        });
+        cursor = best;
+        showAt(best);
+    });
+    plot.addEventListener("pointerleave", () => {
+        if (document.activeElement !== plot) showAt(-1);
+    });
+    plot.addEventListener("focus", () => {
+        if (cursor < 0) cursor = valid.length - 1;
+        showAt(cursor);
+    });
+    plot.addEventListener("blur", () => showAt(-1));
+    plot.addEventListener("keydown", event => {
+        if (event.key === "ArrowLeft") cursor = Math.max(0, cursor - 1);
+        else if (event.key === "ArrowRight") cursor = Math.min(valid.length - 1, cursor + 1);
+        else if (event.key === "Home") cursor = 0;
+        else if (event.key === "End") cursor = valid.length - 1;
+        else return;
+        event.preventDefault();
+        showAt(cursor);
+    });
+
+    // The hover readout never gates a value: every sample is also in a table.
+    const table = el("details", "chart-data");
+    table.appendChild(el("summary", "", "값 표 보기 · " + valid.length + "개"));
+    const buildTable = () => {
+        if (table.dataset.built) return;
+        table.dataset.built = "1";
+        const wrap = el("div", "chart-table-wrap");
+        const grid = el("table", "chart-table");
+        const headRow = el("tr");
+        headRow.appendChild(el("th", "", "step"));
+        headRow.appendChild(el("th", "", "값"));
+        const thead = el("thead");
+        thead.appendChild(headRow);
+        grid.appendChild(thead);
+        const tbody = el("tbody");
+        for (let i = valid.length - 1; i >= 0; i--) {
+            const tr = el("tr");
+            tr.appendChild(el("td", "", valid[i].step.toLocaleString()));
+            tr.appendChild(el("td", "", show(valid[i].value)));
+            tbody.appendChild(tr);
+        }
+        grid.appendChild(tbody);
+        wrap.appendChild(grid);
+        table.appendChild(wrap);
+    };
+    table.addEventListener("toggle", () => {
+        if (table.open) {
+            openChartTables.add(metric.name);
+            buildTable();
+        } else {
+            openChartTables.delete(metric.name);
+        }
+    });
+    if (openChartTables.has(metric.name)) {
+        buildTable();
+        table.open = true;
+    }
+    box.appendChild(table);
+    return box;
+}
+
+function historyChartsCard(h, steps, metricEntries) {
+    const grid = el("div", "chart-grid");
+
+    for (const metric of metricEntries) {
+        const name = metric.name;
+        const points = (h.points || {})[name];
+        const plotSteps = points ? points.map(p => p.step) : steps;
+        const values = (points ? points.map(p => p.value) : (h.series || {})[name]) || [];
+        if (!values.some(v => Number.isFinite(v))) continue;
+        const chart = metricChart(metric, plotSteps, values);
+        if (chart) grid.appendChild(chart);
     }
 
-    return svg;
+    if (!grid.children.length) {
+        return el("div", "card empty-card", "표시할 값이 있는 트레이닝 추이가 없습니다.");
+    }
+    return grid;
 }
 
 function renderHistory(data, nodeName) {
@@ -980,68 +1787,51 @@ function renderHistory(data, nodeName) {
     const h = selected && selected !== currentHistory.experiment
         ? ((((data.history || {})._archives || {})[nodeName] || {})[selected] || {})
         : currentHistory;
-    const steps = h.steps || [];
-    const series = h.series || {};
-    const coreMetrics = selectCoreMetrics(series, CORE_HISTORY_METRICS);
+    const points = h.points || {};
+    const steps = [...new Set(Object.values(points).flatMap(values =>
+        (values || []).map(point => point.step)))].sort((a, b) => a - b);
+    const coreMetrics = selectCoreMetrics(points, CORE_HISTORY_METRICS);
+    const fullMetrics = allMetricNames(points, nodeName).map(name => ({name: name}));
 
-    const historyLabel = steps.length
+    const stepText = s => isNum(s) ? s.toLocaleString() : String(s);
+    const rangeLabel = steps.length
         ? (steps.length === 1
-            ? "수집 1점 · " + steps[0]
-            : steps[0] + " → " + steps[steps.length - 1])
-        : "";
-    const body = collapsibleSection(
-        host, "history", "Training History", historyLabel);
+            ? "수집 1점 · step " + stepText(steps[0])
+            : "step " + stepText(steps[0]) + " → " + stepText(steps[steps.length - 1]))
+        : "수집 기록 없음";
+    const section = collapsibleSection(
+        host, "history", "Training History",
+        rangeLabel + " · " + coreMetrics.length + " 핵심",
+        rangeLabel + " · " + fullMetrics.length + " 전체",
+        h.experiment || selected || currentHistory.experiment);
 
     if (!steps.length || !coreMetrics.length) {
-        body.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
-        return;
+        section.summary.appendChild(el("div", "card empty-card", "표시할 핵심 트레이닝 추이가 없습니다."));
+    } else {
+        section.summary.appendChild(historyChartsCard(h, steps, coreMetrics));
     }
 
-    const card = el("div", "card");
-    const grid = el("div");
-    grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(260px, 1fr))";
-    grid.style.gap = "18px";
-
-    for (const metric of coreMetrics) {
-        const name = metric.name;
-        const points = (h.points || {})[name];
-        const plotSteps = points ? points.map(p => p.step) : steps;
-        const values = points ? points.map(p => p.value) : series[name];
-        const valid = values.filter(v => typeof v === "number");
-        if (!valid.length) continue;
-
-        const box = el("div");
-        const top = el("div", "metric");
-        top.style.borderBottom = "none";
-        top.style.padding = "0 0 4px";
-        const lab = el("span", "label", metric.label);
-        lab.title = name;
-        const last = valid[valid.length - 1];
-        top.appendChild(lab);
-        top.appendChild(el("span",
-            "value " + (name.indexOf("reward") === 0
-                        ? (last >= 0 ? "green" : "red") : ""),
-            coreMetricValue(metric, last)));
-        box.appendChild(top);
-        box.appendChild(sparkline(plotSteps, values, 260, 60));
-        grid.appendChild(box);
-    }
-
-    card.appendChild(grid);
-    body.appendChild(card);
+    section.setFullRenderer(full => {
+        if (!steps.length || !fullMetrics.length) {
+            full.appendChild(el("div", "card empty-card", "표시할 트레이닝 추이가 없습니다."));
+        } else {
+            full.appendChild(historyChartsCard(h, steps, fullMetrics));
+        }
+    });
 }
 
-function videoStatusText(node, experiment, checkpoint) {
+function videoStatus(node, experiment, checkpoint) {
     const state = node.video_watcher || {};
     if (state.status === "failed" && (!state.experiment || state.experiment === experiment))
-        return "영상 생성 오류: " + (state.error || "감시기 확인 필요");
+        return {level: "err", text: "영상 생성 오류: " + (state.error || "감시기 확인 필요")};
     if (state.experiment !== experiment || state.checkpoint !== checkpoint)
-        return "영상 미등록 · 생성 요청 확인 필요";
+        return {level: "unk", text: "영상 미등록 · 생성 요청 확인 필요"};
     if (Date.now() / 1000 - state.updated_at > 360)
-        return "영상 감시 상태 오래됨 · 확인 필요";
-    return {compatibility_blocked: "환경 변경 감지 · 영상 어댑터 검증 필요", generating: "테스트 영상 생성 중", uploading: "영상 업로드 중",
-            uploaded: "영상 업로드 완료 · 게시 반영 중"}[state.status] || "영상 대기 중";
+        return {level: "warn", text: "영상 감시 상태 오래됨 · 확인 필요"};
+    if (state.status === "compatibility_blocked")
+        return {level: "warn", text: "환경 변경 감지 · 영상 어댑터 검증 필요"};
+    return {level: "unk", text: {generating: "테스트 영상 생성 중", uploading: "영상 업로드 중",
+            uploaded: "영상 업로드 완료 · 게시 반영 중"}[state.status] || "영상 대기 중"};
 }
 
 function renderRanking(data, nodeName) {
@@ -1071,92 +1861,196 @@ function renderRanking(data, nodeName) {
     const latest = latestSaved && (!rankedLatest || latestSaved.iteration > rankedLatest.iteration)
         ? latestSaved : (rankedLatest || latestSaved);
 
-    const head = el("div", "node-head");
-    head.appendChild(el("div", "node-name", "Checkpoint Ranking"));
-    if (experiment) head.appendChild(el("div", "badge", experiment));
+    const head = el("div", "section-h");
+    head.appendChild(el("h2", "", "Checkpoint Ranking"));
+    if (experiment) {
+        const sub = el("span", "sub mono", experiment);
+        sub.title = experiment;
+        head.appendChild(sub);
+    }
     host.appendChild(head);
 
     if (!r || r.error || ![r.latest, r.best_reward, r.best_vx_rmse].some(Boolean)) {
-        host.appendChild(el("div", "card empty-card",
+        host.appendChild(notice("info",
                             noFixedEvaluation ? "고정 평가 미설정 · 최신 체크포인트는 평가와 별도로 표시합니다."
-                            : "평가가 완료된 체크포인트 랭킹이 없습니다."));
+                            : "평가가 완료된 체크포인트 랭킹이 없습니다.", "rank-notice"));
     } else if (!r.verified_count) {
-        host.appendChild(el("div", "card empty-card",
-            "기존 체크포인트와 점수는 보존되어 있습니다. BEST는 동일 조건에서 체크포인트·정규화 파일과의 연결이 검증된 평가로만 선정합니다."));
+        host.appendChild(notice("info",
+            "기존 체크포인트와 점수는 보존되어 있습니다. BEST는 동일 조건에서 체크포인트·정규화 파일과의 연결이 검증된 평가로만 선정합니다.",
+            "rank-notice"));
     }
-    const grid = el("div", "grid");
+
     const cards = [
         ["LATEST", "latest", latest],
         ["BEST REWARD", "best_reward", !noFixedEvaluation && r && r.best_reward],
         ["BEST VX RMSE", "best_vx_rmse", !noFixedEvaluation && r && r.best_vx_rmse],
     ];
+    const descriptions = {
+        latest: "가장 최근에 저장된 체크포인트",
+        best_reward: "검증된 평가 리워드가 가장 높은 체크포인트",
+        best_vx_rmse: "검증된 전진 속도 추종 오차가 가장 작은 체크포인트",
+    };
+    // One column per slot. A slot without a matching checkpoint gets a single
+    // cell spanning every row, stating why, instead of a column of dashes.
+    const columns = [];
     for (const [title, slot, v] of cards) {
-        const c = el("div", "card");
-        c.appendChild(el("div", "card-title", title));
-        const descriptions = {
-            latest: "가장 최근에 저장된 체크포인트",
-            best_reward: "검증된 평가 리워드가 가장 높은 체크포인트",
-            best_vx_rmse: "검증된 전진 속도 추종 오차가 가장 작은 체크포인트",
-        };
-        c.appendChild(el("div", "video-unavailable", descriptions[slot]));
+        const column = { title: title, description: descriptions[slot] };
+        columns.push(column);
         if (!v || v.node_name !== nodeName || v.run_id !== experiment) {
             if (slot === 'latest' || noFixedEvaluation) {
-                c.appendChild(row('상태', slot === 'latest' ? '저장된 체크포인트 없음' : '고정 평가 미설정'));
-                c.appendChild(el('div', 'video-unavailable', slot === 'latest'
-                    ? '선택한 학습에서 수집된 체크포인트가 아직 없습니다.'
-                    : '평가 점수가 없어 BEST를 선정하지 않습니다.'));
-                grid.appendChild(c);
+                column.unavailable = {
+                    level: "unk",
+                    state: slot === 'latest' ? '저장된 체크포인트 없음' : '고정 평가 미설정',
+                    note: slot === 'latest'
+                        ? '선택한 학습에서 수집된 체크포인트가 아직 없습니다.'
+                        : '평가 점수가 없어 BEST를 선정하지 않습니다.' };
                 continue;
             }
             const unavailable = !r || r.error;
-            c.appendChild(row("상태", unavailable ? "랭킹 데이터 확인 필요" :
-                slot === "latest" ? "체크포인트 대기" : "검증 대기 · BEST 미선정"));
-            c.appendChild(el("div", "video-unavailable", unavailable
-                ? "선택한 학습의 랭킹 데이터를 아직 확인할 수 없습니다."
-                : slot === "latest" ? "수집된 체크포인트가 아직 없습니다."
-                : "선정 조건을 충족한 평가가 없습니다. 기존 체크포인트는 재평가가 필요하며, 이 표시는 재평가 작업이 자동 실행 중이라는 뜻은 아닙니다."));
-            grid.appendChild(c);
+            column.unavailable = {
+                level: unavailable ? "warn" : "unk",
+                state: unavailable ? "랭킹 데이터 확인 필요" :
+                    slot === "latest" ? "체크포인트 대기" : "검증 대기 · BEST 미선정",
+                note: unavailable
+                    ? "선택한 학습의 랭킹 데이터를 아직 확인할 수 없습니다."
+                    : slot === "latest" ? "수집된 체크포인트가 아직 없습니다."
+                    : "선정 조건을 충족한 평가가 없습니다. 기존 체크포인트는 재평가가 필요하며, 이 표시는 재평가 작업이 자동 실행 중이라는 뜻은 아닙니다." };
             continue;
         }
-        c.appendChild(row("Checkpoint", v.checkpoint || "-", "blue"));
-        c.appendChild(row("Iteration", String(v.iteration)));
-        if (!v.artifact_only && !noFixedEvaluation) {
-            c.appendChild(row("Fixed-eval Reward", fmt(v.reward), "green"));
-            c.appendChild(row("VX RMSE", fmt(v.vx_rmse)));
-        }
-        c.appendChild(row("평가", noFixedEvaluation ? '고정 평가 미설정' :
-            v.artifact_only ? '평가 결과 없음' : v.verified ? "검증됨" : "미검증 · 참고값"));
+        const evaluated = !v.artifact_only && !noFixedEvaluation;
+        const evalText = noFixedEvaluation ? '고정 평가 미설정' :
+            v.artifact_only ? '평가 결과 없음' : v.verified ? "검증됨" : "미검증 · 참고값";
         const video = videos[slot];
         const videoMatches = video && video.node_name === nodeName &&
             video.run_id === experiment && video.checkpoint === v.checkpoint &&
             (!v.checkpoint_sha256 || video.checkpoint_sha256 === v.checkpoint_sha256);
-        if (videoMatches) {
-            const button = el("button", "video-btn", "테스트 영상 보기");
-            button.type = "button";
-            button.onclick = () => openRankVideo(videos[slot], nodeName, title);
-            c.appendChild(button);
-        } else {
-            c.appendChild(el("div", "video-unavailable", video ? "영상 식별정보 불일치 · 재생 보류" : videoStatusText(n, experiment, v.checkpoint)));
-        }
-        grid.appendChild(c);
+        // A factory, not nodes: the same cell is drawn in the wide table and in
+        // the narrow-screen cards.
+        column.cell = key => {
+            if (key === "checkpoint") return v.checkpoint ? el("span", "mono", v.checkpoint) : missing();
+            if (key === "iteration") return isNum(v.iteration) ? v.iteration.toLocaleString()
+                : (v.iteration != null ? String(v.iteration) : missing());
+            if (key === "reward") return evaluated ? fmt(v.reward) : missing(evalText);
+            if (key === "vx") return evaluated ? fmt(v.vx_rmse) : missing(evalText);
+            if (key === "evaluation") return statusTag(
+                evaluated ? (v.verified ? "ok" : "warn") : "unk", evalText, "sm");
+            if (videoMatches) {
+                const button = el("button", "video-btn", "▶ 테스트 영상 보기");
+                button.type = "button";
+                button.onclick = () => openRankVideo(videos[slot], nodeName, title);
+                return button;
+            }
+            if (video) return statusTag("warn", "영상 식별정보 불일치 · 재생 보류", "sm");
+            const state = videoStatus(n, experiment, v.checkpoint);
+            return statusTag(state.level, state.text, "sm");
+        };
     }
-    host.appendChild(grid);
+
+    const rows = [
+        ["Checkpoint", "checkpoint"], ["Iteration", "iteration"],
+        ["Fixed-eval Reward", "reward"], ["VX RMSE", "vx"],
+        ["평가", "evaluation"], ["테스트 영상", "video"],
+    ];
+    const table = el("table", "rank-table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    headRow.appendChild(el("th", "", ""));
+    for (const column of columns) {
+        const th = el("th");
+        th.scope = "col";
+        th.appendChild(el("span", "", column.title));
+        th.appendChild(el("span", "desc", column.description));
+        headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    rows.forEach(([label, key], index) => {
+        const tr = el("tr");
+        const th = el("th", "", label);
+        th.scope = "row";
+        tr.appendChild(th);
+        for (const column of columns) {
+            if (column.unavailable) {
+                if (index !== 0) continue;
+                const td = el("td", "unavailable");
+                td.rowSpan = rows.length;
+                td.appendChild(statusTag(column.unavailable.level, column.unavailable.state, "sm"));
+                td.appendChild(el("p", "card-note", column.unavailable.note));
+                tr.appendChild(td);
+                continue;
+            }
+            const td = el("td");
+            const value = column.cell(key);
+            if (value instanceof Node) td.appendChild(value);
+            else td.textContent = value;
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    const wrap = el("div", "table-wrap rank-table-wrap");
+    wrap.appendChild(table);
+    host.appendChild(wrap);
+
+    // Narrow screens: the same content as one card per slot, so no column
+    // hides behind a horizontal scroll.
+    const stack = el("div", "rank-cards");
+    for (const column of columns) {
+        const card = el("section", "card");
+        card.appendChild(el("h3", "rank-card-title", column.title));
+        card.appendChild(el("p", "card-note", column.description));
+        if (column.unavailable) {
+            card.appendChild(statusTag(column.unavailable.level, column.unavailable.state, "sm"));
+            card.appendChild(el("p", "card-note", column.unavailable.note));
+        } else {
+            for (const [label, key] of rows) card.appendChild(row(label, column.cell(key)));
+        }
+        stack.appendChild(card);
+    }
+    host.appendChild(stack);
 }
 
 let latestDashboardData = null;
 let refreshError = null;
+let refreshErrorNetwork = false;
 let lastSuccessAt = null;
+let latestDataVersion = null;
 const selectedRuns = {};
 
 function nodeAvailability(data, name) {
-    const n = (data.status || {})[name] || {};
     const health = (((data.health || {}).nodes || {})[name] || {});
     const elapsed = Math.max(0, Date.now() / 1000 - (data.generated_at || 0));
     const age = (health.heartbeat_age_sec ?? Infinity) + elapsed;
-    if (refreshError) return "갱신 실패 · 상태 미확인";
-    if (elapsed > 180) return "데이터 오래됨 · 상태 미확인";
-    if (health.status === "OFFLINE" || age > 60) return "OFFLINE · 학습 상태 미확인";
+    if (refreshError) return refreshErrorNetwork
+        ? {kind: "disconnected", text: "연결 끊김 · 상태 미확인"}
+        : {kind: "refresh-failed", text: "갱신 실패 · 상태 미확인"};
+    if (elapsed > 180) return {kind: "stale", text: "데이터 오래됨 · 상태 미확인"};
+    if (health.status === "OFFLINE") return {kind: "offline", text: "오프라인 · 학습 상태 미확인"};
+    // No heartbeat on record is "unknown", not proof the PC is down.
+    if (health.heartbeat_age_sec == null) {
+        return {kind: "no-heartbeat", text: "하트비트 정보 없음 · 상태 미확인"};
+    }
+    if (age > 60) return {kind: "offline", text: "오프라인 · 학습 상태 미확인"};
     return null;
+}
+
+function nodeState(data, name) {
+    const n = (data.status || {})[name] || {};
+    const running = !!(n.training || {}).running;
+    const processCount = trainingProcesses(n).length;
+    const availability = nodeAvailability(data, name);
+    if (availability) {
+        const offline = availability.kind === "offline";
+        return { level: offline ? "err" : "warn", icon: offline ? "err" : "unk",
+                 text: availability.text, stale: true };
+    }
+    if (processCount > 1) {
+        return { level: "warn", icon: "warn", stale: false,
+                 text: running ? "학습 " + processCount + "개 동시 실행" : "학습 중지됨" };
+    }
+    if (running) return { level: "ok", icon: "ok", text: "학습 중", stale: false };
+    return { level: "err", icon: "stop", text: "학습 중지됨", stale: false };
 }
 
 function selectedRunProcess(data, nodeName) {
@@ -1170,23 +2064,58 @@ function selectedRunProcess(data, nodeName) {
         .find(p => (p.experiment || {}).name === selected) || {};
 }
 
+// Global reception state. Same thresholds as nodeAvailability: a failed
+// refresh, or a publication older than 180 s.
+function renderHeader(data) {
+    const generatedAt = Number(data.generated_at);
+    const age = Number.isFinite(generatedAt)
+        ? Math.max(0, Date.now() / 1000 - generatedAt) : null;
+    let level, text, iconKind, note = "";
+    if (refreshError) {
+        level = "err";
+        text = refreshErrorNetwork ? "연결 끊김" : "갱신 실패";
+        note = (refreshErrorNetwork ? "서버에 연결하지 못했습니다" : "데이터를 갱신하지 못했습니다") +
+            " (" + refreshError + "). 화면의 값은 마지막으로 받은 데이터이며, 다음 확인 때 다시 시도합니다.";
+    } else if (age === null) {
+        level = "warn";
+        iconKind = "unk";
+        text = "게시 시각 미확인";
+        note = "데이터에 게시 시각이 없어 최신 여부를 판단할 수 없습니다.";
+    } else if (age > 180) {
+        level = "warn";
+        text = "데이터 오래됨";
+        note = "새 데이터가 " + durationText(age) +
+            " 동안 게시되지 않았습니다. 화면의 값은 마지막 게시 데이터입니다.";
+    } else {
+        level = "ok";
+        text = "실시간 수신 중";
+    }
+
+    document.getElementById("conn").className = "conn " + level;
+    const state = document.getElementById("connState");
+    if (state.dataset.key !== level + "|" + text) {
+        state.dataset.key = level + "|" + text;
+        state.textContent = "";
+        state.appendChild(statusTag(level, text, "lg", iconKind));
+    }
+    setText(document.getElementById("connPublished"), data.generated_at_text || "-");
+    setText(document.getElementById("connAge"), age === null ? "" : "(" + ageText(age) + ")");
+    setText(document.getElementById("connLast"), lastSuccessAt ? clockText(lastSuccessAt) : "-");
+    setText(document.getElementById("connCycle"),
+            Math.round(DASHBOARD_REFRESH_MS / 1000) + "초마다 확인");
+    const noteBox = document.getElementById("connNote");
+    setText(noteBox, note);
+    noteBox.hidden = !note;
+    renderAlertSummary(data);
+}
+
 function updateFreshness() {
     if (!latestDashboardData) return;
-    const age = Math.max(0, Math.round(Date.now() / 1000 - latestDashboardData.generated_at));
-    const stamp = document.getElementById("stamp");
-    stamp.textContent = "게시 " + (latestDashboardData.generated_at_text || "-") +
-        " · 데이터 경과 " + age + "초" +
-        (refreshError ? " · 갱신 실패: " + refreshError : "") +
-        (lastSuccessAt ? " · 마지막 수신 " + new Date(lastSuccessAt).toLocaleTimeString() : "");
-    stamp.style.color = refreshError || age > 180 ? "#f85149" : "";
+    renderHeader(latestDashboardData);
     // Only redraw status summaries: preserve an open video and run selection.
-    if (!selectedNodeFromHash(latestDashboardData)) renderNodes(latestDashboardData);
-    else {
-        const badge = document.getElementById("detail-health");
-        const name = selectedNodeFromHash(latestDashboardData);
-        if (badge) badge.textContent = nodeAvailability(latestDashboardData, name) ||
-            (((latestDashboardData.status[name] || {}).training || {}).running ? "RUNNING" : "STOPPED");
-    }
+    const name = selectedNodeFromHash(latestDashboardData);
+    if (!name) renderNodes(latestDashboardData);
+    else renderDetailStatus(latestDashboardData, name);
 }
 setInterval(updateFreshness, 1000);
 
@@ -1221,20 +2150,60 @@ function navigateToOverview() {
     }
 }
 
+function renderSimulationEntry(data, nodeName, host) {
+    const section=el("section","sim-entry");
+    const head=el("div","sim-entry-head");head.appendChild(el("h2","","로봇 시뮬레이션 · 다족 / 트랜스포머"));
+    const sim=data.simulation||{};
+    if(sim.external_url){
+        const external=new URL(sim.external_url);external.searchParams.set("node",nodeName);
+        if(external.protocol==="https:"){
+            const remoteLink=el("a","sim-link","외부 접속 · 시뮬레이션 →");remoteLink.href=external.href;head.appendChild(remoteLink);
+        }
+    }
+    if(sim.control_url){
+        const url=new URL(sim.control_url);url.searchParams.set("node",nodeName);
+        if(["http:","https:"].includes(url.protocol)){
+            const link=el("a","sim-link",sim.external_url?"내부망 접속 →":"시뮬레이션 모드 →");link.href=url.href;head.appendChild(link);
+        }
+    }else{head.appendChild(el("span","","실행 서버 연결 정보 업데이트 중"));}
+    section.appendChild(head);
+    section.appendChild(el("p","","저장 정책 / 학습 체크포인트 · 수동 조작 / 자동 시나리오 · 로봇 추적 화면"));
+    section.appendChild(el("p","",sim.external_url?"외부 접속은 로그인 후 사용할 수 있습니다. 내부망에서는 내부망 접속 버튼을 이용하세요.":"실시간 실행은 PC·젯슨과 연결된 내부망에서 열립니다. 최근 결과는 이 대시보드에서도 확인할 수 있습니다."));
+    const results=sim.results||{}, grouped=results.by_project?.[nodeName];
+    const entries=grouped?Object.entries(grouped):[[results[nodeName]?.project||"bethex",results[nodeName]]];
+    let found=false;
+    for(const [project,result] of entries){
+    if(result){
+        found=true;
+        const projectLabel=project==="gogidong"?"트랜스포머 · Gogidong Unit2":"다족 · BeTheX-Q";
+        section.appendChild(el("h3","",projectLabel));
+        const p=result.policy||{},m=result.metrics||{};
+        const states={completed:"완료",stopped:"사용자 종료",aborted:"중단",fault:"실행 중단"};
+        const text="최근 실행: "+(states[result.status]||result.status)+" · "+(p.run||"")+" / "+(p.checkpoint||"")+" · "+new Date(result.started_at*1000).toLocaleString()+" · "+Number(result.elapsed||0).toFixed(1)+"초";
+        section.appendChild(el("p","",text));
+        if(result.error)section.appendChild(el("p","",result.error));
+        if(m.vx_rmse!==undefined)section.appendChild(el("p","","속도 RMSE "+m.vx_rmse.toFixed(3)+" m/s · 회전 RMSE "+m.yaw_rmse.toFixed(3)+" rad/s"));
+        const charts=el("div","sim-result-charts");section.appendChild(charts);BethexCharts.render(charts,result,true);
+    }}
+    if(!found){section.appendChild(el("p","","아직 이 PC 화면에서 실행한 시뮬레이션 결과가 없습니다."));}
+    host.appendChild(section);
+}
+
 function renderDetailHead(data, nodeName) {
     const host = document.getElementById("detailhead");
     host.textContent = "";
 
-    const toolbar = el("div", "detail-toolbar");
-    const back = el("button", "nav-btn", "← 전체 현황");
+    const toolbar = el("nav", "toolbar");
+    toolbar.setAttribute("aria-label", "화면 이동");
+    const back = el("button", "tab", "← 전체 현황");
     back.type = "button";
     back.onclick = navigateToOverview;
     toolbar.appendChild(back);
+    toolbar.appendChild(el("span", "sep"));
 
-    const nav = el("div", "detail-nav");
+    const nav = el("div", "tabs");
     for (const name of Object.keys(data.status || {}).sort()) {
-        const button = el("button", "nav-btn" + (name === nodeName ? " active" : ""),
-                          nodeLabel(name));
+        const button = el("button", "tab", nodeLabel(name));
         button.type = "button";
         button.setAttribute("aria-label", nodeLabel(name) + " 상세 보기");
         if (name === nodeName) button.setAttribute("aria-current", "page");
@@ -1242,21 +2211,11 @@ function renderDetailHead(data, nodeName) {
         nav.appendChild(button);
     }
     toolbar.appendChild(nav);
-    host.appendChild(toolbar);
 
     const n = (data.status || {})[nodeName] || {};
-    const running = !!(n.training || {}).running;
-    const processCount = trainingProcesses(n).length;
-    const title = el("div", "detail-title");
-    title.appendChild(el("div", "node-name", nodeLabel(nodeName)));
-    title.appendChild(el("div", "node-source", nodeName));
-    const healthBadge = el("div", "badge",
-        nodeAvailability(data, nodeName) || (running
-            ? "RUNNING · " + processCount + " JOBS" : "STOPPED"));
-    healthBadge.id = "detail-health";
-    title.appendChild(healthBadge);
-    host.appendChild(title);
-    const selector = el("select", "nav-btn");
+    const picker = el("label", "run-select");
+    picker.appendChild(el("span", "", "실험"));
+    const selector = el("select");
     selector.setAttribute("aria-label", "실험 선택");
     const live = (primaryProcess(n).experiment || {}).name;
     selector.appendChild(el("option", "", live ? "현재 실행 · " + live : "최근 실행"));
@@ -1272,23 +2231,78 @@ function renderDetailHead(data, nodeName) {
         selectedRuns[nodeName] = selector.value;
         renderDashboard(latestDashboardData);
     };
-    host.appendChild(selector);
+    picker.appendChild(selector);
+    toolbar.appendChild(picker);
+    host.appendChild(toolbar);
+    renderSimulationEntry(data, nodeName, host);
+
+    const picked = selectedRuns[nodeName];
+    if (picked && picked !== live) {
+        host.appendChild(notice("info",
+            "지난 실험 " + picked + " 을(를) 보고 있습니다. 지표·추이·랭킹은 선택한 실험 기준이고, " +
+            "Running Processes와 PC 상태는 현재 기준입니다.", "run-note"));
+    }
+}
+
+// Re-rendered every second, so it holds no focusable controls.
+function renderDetailStatus(data, nodeName) {
+    const host = document.getElementById("detailstatus");
+    host.textContent = "";
+    const n = (data.status || {})[nodeName] || {};
+    const state = nodeState(data, nodeName);
+    const box = el("section", "pc-strip " + state.level + (state.stale ? " is-stale" : ""));
+    box.setAttribute("aria-label", nodeLabel(nodeName) + " 상태");
+
+    const ident = el("div", "ident");
+    ident.appendChild(el("h2", "pc-name", nodeLabel(nodeName)));
+    if (nodeLabel(nodeName) !== nodeName) ident.appendChild(el("span", "pc-host", nodeName));
+    ident.appendChild(statusTag(state.level, state.text, "pill", state.icon));
+    box.appendChild(ident);
+
+    const strip = el("dl", "strip");
+    const item = (label, text) => {
+        const wrap = el("div");
+        wrap.appendChild(el("dt", "", label));
+        const dd = el("dd");
+        if (text === null || text === undefined || text === "") dd.appendChild(missing());
+        else dd.textContent = text;
+        wrap.appendChild(dd);
+        strip.appendChild(wrap);
+    };
+    item("하트비트", heartbeatText(data, nodeName, true));
+    item("Hostname", n.hostname);
+    item("CPU", percentText(n.cpu_percent));
+    item("RAM", percentText(n.ram_percent));
+    const gpus = n.gpus || [];
+    const g = gpus[0] || {};
+    item(gpus.length > 1 ? "GPU (1/" + gpus.length + ")" : "GPU", g.name);
+    item("VRAM", vramText(g));
+    item("GPU 온도", isNum(g.temperature) ? g.temperature + " °C" : null);
+    box.appendChild(strip);
+
+    if (state.stale) {
+        box.appendChild(notice(state.level,
+            "표시된 값은 마지막으로 받은 값입니다. 현재 상태는 확인되지 않았습니다."));
+    }
+    host.appendChild(box);
 }
 
 function renderRunningProcesses(data, nodeName) {
     const host = document.getElementById("jobs");
     host.textContent = "";
-    host.className = "process-section";
 
     const n = (data.status || {})[nodeName] || {};
     const processes = trainingProcesses(n);
     const primary = primaryProcess(n);
 
-    const head = el("div", "node-head");
-    head.appendChild(el("div", "node-name", "Running Processes"));
-    head.appendChild(el(
-        "div", "badge " + (processes.length > 1 ? "warn" : ""),
-        String(processes.length)));
+    const head = el("div", "section-h");
+    head.appendChild(el("h2", "", "Running Processes"));
+    head.appendChild(el("span", "sub", "현재 실행 기준"));
+    const tools = el("div", "tools");
+    tools.appendChild(processes.length > 1
+        ? statusTag("warn", "동시 실행 " + processes.length + "개", "pill")
+        : el("span", "badge", String(processes.length)));
+    head.appendChild(tools);
     host.appendChild(head);
 
     if (!processes.length) {
@@ -1297,70 +2311,126 @@ function renderRunningProcesses(data, nodeName) {
     }
 
     if (processes.length > 1) {
-        host.appendChild(el(
-            "div", "concurrent-notice",
+        host.appendChild(notice("warn",
             "주의: 동일 PC에서 학습 " + processes.length +
-            "개가 동시에 실행 중입니다. 각 PID와 실험명을 확인하세요."));
+            "개가 동시에 실행 중입니다. 각 PID와 실험명을 확인하세요.", "concurrent-notice"));
     }
 
-    const grid = el("div", "process-grid");
+    const list = el("div", "process-list");
     for (const process of processes) {
-        grid.appendChild(processItem(process, process === primary));
+        list.appendChild(processItem(process, process === primary));
     }
-    host.appendChild(grid);
+    host.appendChild(list);
 }
+
+let lastView = null;
 
 function renderDashboard(data) {
     latestDashboardData = data;
     const nodeName = selectedNodeFromHash(data);
     const overview = document.getElementById("overview");
     const detail = document.getElementById("detail");
+    const view = nodeName ? "node:" + nodeName : "overview";
+    document.getElementById("app").dataset.view = nodeName ? "detail" : "overview";
+    document.getElementById("crumb").textContent =
+        nodeName ? nodeLabel(nodeName) + " 상세" : "전체 현황";
+    document.title = (nodeName ? nodeLabel(nodeName) + " · " : "") + "RL Experiment Supervisor";
 
     if (nodeName) {
         overview.style.display = "none";
         detail.style.display = "";
         renderDetailHead(data, nodeName);
+        renderDetailStatus(data, nodeName);
         renderRunningProcesses(data, nodeName);
+        renderRunConfig(data, nodeName);
         renderMetrics(data, nodeName);
         renderHistory(data, nodeName);
         renderRanking(data, nodeName);
     } else {
         detail.style.display = "none";
         overview.style.display = "";
-        renderAlerts(data);
         renderNodes(data);
+        renderAlerts(data);
     }
+    renderHeader(data);
+    // Switching screens starts at the top; data refreshes keep the position.
+    if (lastView !== null && lastView !== view) window.scrollTo(0, 0);
+    lastView = view;
 }
 
 window.addEventListener("hashchange", () => {
     if (latestDashboardData) renderDashboard(latestDashboardData);
 });
 
+document.getElementById("alertSummary").onclick = () => {
+    const reveal = () => document.getElementById("alertbox").scrollIntoView({ block: "start" });
+    if (latestDashboardData && selectedNodeFromHash(latestDashboardData)) {
+        navigateToOverview();
+        setTimeout(reveal, 50);
+    } else {
+        reveal();
+    }
+};
+
 let passphrase = sessionStorage.getItem("rl_pass") || "";
 
+function responseVersion(response) {
+    return [response.headers.get("etag") || "",
+            response.headers.get("last-modified") || "",
+            response.headers.get("content-length") || ""].join("|");
+}
+
+// fetch() only rejects when no response arrived at all. Tag that case so the
+// header can say "연결 끊김" rather than a generic refresh failure.
+async function fetchResponse(url, options) {
+    try {
+        return await fetch(url, options);
+    } catch (error) {
+        const disconnected = new Error("서버 응답 없음 · " + error.message);
+        disconnected.network = true;
+        throw disconnected;
+    }
+}
+
 async function load() {
-    const res = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+    // Poll with a tiny metadata request.  The encrypted payload is several MB,
+    // so downloading, parsing and decrypting it every 30 seconds when nothing
+    // changed made an open dashboard progressively expensive.
+    if (latestDataVersion) {
+        const probe = await fetchResponse("data.json", {method: "HEAD", cache: "no-store"});
+        if (!probe.ok) throw new Error("data.json 상태를 확인하지 못했습니다 (" + probe.status + ")");
+        const probedVersion = responseVersion(probe);
+        if (probedVersion && probedVersion === latestDataVersion) {
+            lastSuccessAt = Date.now();
+            refreshError = null;
+            refreshErrorNetwork = false;
+            updateFreshness();
+            return latestDashboardData;
+        }
+    }
+
+    const res = await fetchResponse("data.json", { cache: "no-store" });
     if (!res.ok) throw new Error("data.json 을 불러오지 못했습니다 (" + res.status + ")");
     const envelope = await res.json();
     const data = await decrypt(envelope, passphrase);
+    latestDataVersion = responseVersion(res);
     latestEnvelope = envelope;
     lastSuccessAt = Date.now();
     refreshError = null;
-
-    const generatedAt = Number(data.generated_at);
-    const ageSeconds = Number.isFinite(generatedAt)
-        ? Math.max(0, Math.round(Date.now() / 1000 - generatedAt)) : null;
-    document.getElementById("stamp").textContent =
-        "갱신 " + (data.generated_at_text || "-") +
-        (ageSeconds === null ? "" : "  ·  데이터 지연 " + ageSeconds + "초") +
-        "  ·  화면 " + new Date().toLocaleTimeString();
+    refreshErrorNetwork = false;
     renderDashboard(data);
 }
 
 function refreshDashboard() {
     if (!passphrase || refreshPromise) return refreshPromise;
     refreshPromise = load()
-        .catch(error => { refreshError = error.message; updateFreshness(); })
+        .catch(error => {
+            // WebCrypto failures can carry an empty message; never let a
+            // failed refresh look like a successful one.
+            refreshError = error.message || error.name || "알 수 없는 오류";
+            refreshErrorNetwork = !!error.network;
+            updateFreshness();
+        })
         .finally(() => { refreshPromise = null; });
     return refreshPromise;
 }
@@ -1380,7 +2450,9 @@ async function open_() {
         setInterval(refreshDashboard, DASHBOARD_REFRESH_MS);
     } catch (e) {
         // A wrong passphrase fails the GCM tag check, which lands here.
-        err.textContent = "암호가 틀렸거나 데이터를 읽을 수 없습니다.";
+        err.textContent = e && e.network
+            ? "서버에 연결할 수 없습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요."
+            : "암호가 틀렸거나 데이터를 읽을 수 없습니다.";
         sessionStorage.removeItem("rl_pass");
     }
 }
