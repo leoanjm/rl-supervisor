@@ -5810,7 +5810,9 @@ function previousRunDuration(data, nodeName, experiment) {
 function nodeAvailability(data, name) {
     const health = (((data.health || {}).nodes || {})[name] || {});
     const elapsed = Math.max(0, Date.now() / 1000 - (data.generated_at || 0));
-    const age = (health.heartbeat_age_sec ?? Infinity) + elapsed;
+    // Health is measured by the supervisor at snapshot time. Static hosting
+    // latency is checked separately below; it is not a missed worker heartbeat.
+    const age = health.heartbeat_age_sec ?? Infinity;
     if (refreshError) return refreshErrorNetwork
         ? {kind: "disconnected", text: "연결 끊김 · 상태 미확인"}
         : {kind: "refresh-failed", text: "갱신 실패 · 상태 미확인"};
