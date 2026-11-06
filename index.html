@@ -2190,7 +2190,7 @@ async function openRankVideo(meta, nodeName, rankTitle) {
         if (!envelope) throw new Error("암호화 정보가 없습니다.");
         if (meta.node_name !== nodeName) throw new Error("영상 노드 정보가 일치하지 않습니다.");
         const response = await fetch(
-            meta.path + "?v=" + encodeURIComponent(meta.updated_at || ""),
+            livePublishedAsset(meta.path) + "?v=" + encodeURIComponent(meta.updated_at || ""),
             { cache: "no-store", signal });
         if (!current()) return;
         if (!response.ok) {
@@ -11379,6 +11379,13 @@ async function fetchResponse(url, options) {
     }
 }
 
+const LIVE_PUBLISH_ROOT = 'https://raw.githubusercontent.com/leoanjm/rl-supervisor/live-data/';
+function livePublishedAsset(path) {
+    if (!/^media\/(rank-[a-f0-9]{24}\.enc|detail-[a-f0-9]{64}\.json)$/.test(path))
+        throw new Error('게시 자료 경로 검증 실패');
+    return LIVE_PUBLISH_ROOT + path;
+}
+function liveStateUrl() { return LIVE_PUBLISH_ROOT + 'data.json?refresh=' + Date.now(); }
 const dashboardDetailCache = new Map();
 async function hydrateDashboardDetails(data) {
     const allowed = new Set(['rehearsal','studies','zero_stop','policies']);
@@ -11387,7 +11394,7 @@ async function hydrateDashboardDetails(data) {
             throw new Error('분석 자료 경로 검증 실패');
         if (!dashboardDetailCache.has(path)) {
             const pending = (async () => {
-                const response = await fetchResponse(path, {cache:'force-cache'});
+                const response = await fetchResponse(livePublishedAsset(path), {cache:'force-cache'});
                 if (!response.ok) throw new Error('분석 자료 수신 실패 ('+response.status+')');
                 return decrypt(await response.json(), passphrase);
             })().catch(error => {dashboardDetailCache.delete(path);throw error;});
@@ -11404,7 +11411,7 @@ async function load() {
     // so downloading, parsing and decrypting it every 30 seconds when nothing
     // changed made an open dashboard progressively expensive.
     if (latestDataVersion) {
-        const probe = await fetchResponse("data.json", {method: "HEAD", cache: "no-store"});
+        const probe = await fetchResponse(liveStateUrl(), {method: "HEAD", cache: "no-store"});
         if (!probe.ok) throw new Error("data.json 상태를 확인하지 못했습니다 (" + probe.status + ")");
         const probedVersion = responseVersion(probe);
         if (probedVersion && probedVersion === latestDataVersion) {
@@ -11416,7 +11423,7 @@ async function load() {
         }
     }
 
-    const res = await fetchResponse("data.json", { cache: "no-store" });
+    const res = await fetchResponse(liveStateUrl(), { cache: "no-store" });
     if (!res.ok) throw new Error("data.json 을 불러오지 못했습니다 (" + res.status + ")");
     const envelope = await res.json();
     const data = expandPackedHistory(await hydrateDashboardDetails(await decrypt(envelope, passphrase)));
