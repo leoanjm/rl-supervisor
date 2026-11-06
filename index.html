@@ -11379,6 +11379,26 @@ async function fetchResponse(url, options) {
     }
 }
 
+const dashboardDetailCache = new Map();
+async function hydrateDashboardDetails(data) {
+    const allowed = new Set(['rehearsal','studies','zero_stop','policies']);
+    const values = await Promise.all(Object.entries(data._details || {}).map(async ([name,path]) => {
+        if (!allowed.has(name) || !/^media\/detail-[a-f0-9]{64}\.json$/.test(path))
+            throw new Error('분석 자료 경로 검증 실패');
+        if (!dashboardDetailCache.has(path)) {
+            const pending = (async () => {
+                const response = await fetchResponse(path, {cache:'force-cache'});
+                if (!response.ok) throw new Error('분석 자료 수신 실패 ('+response.status+')');
+                return decrypt(await response.json(), passphrase);
+            })().catch(error => {dashboardDetailCache.delete(path);throw error;});
+            dashboardDetailCache.set(path,pending);
+        }
+        return [name,await dashboardDetailCache.get(path)];
+    }));
+    for (const [name,value] of values) data[name]=value;
+    return data;
+}
+
 async function load() {
     // Poll with a tiny metadata request.  The encrypted payload is several MB,
     // so downloading, parsing and decrypting it every 30 seconds when nothing
@@ -11399,7 +11419,7 @@ async function load() {
     const res = await fetchResponse("data.json", { cache: "no-store" });
     if (!res.ok) throw new Error("data.json 을 불러오지 못했습니다 (" + res.status + ")");
     const envelope = await res.json();
-    const data = expandPackedHistory(await decrypt(envelope, passphrase));
+    const data = expandPackedHistory(await hydrateDashboardDetails(await decrypt(envelope, passphrase)));
     latestDataVersion = responseVersion(res);
     latestEnvelope = envelope;
     lastSuccessAt = Date.now();
