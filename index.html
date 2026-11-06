@@ -2189,9 +2189,8 @@ async function openRankVideo(meta, nodeName, rankTitle) {
     try {
         if (!envelope) throw new Error("암호화 정보가 없습니다.");
         if (meta.node_name !== nodeName) throw new Error("영상 노드 정보가 일치하지 않습니다.");
-        const response = await fetch(
-            livePublishedAsset(meta.path) + "?v=" + encodeURIComponent(meta.updated_at || ""),
-            { cache: "no-store", signal });
+        const response = await fetchPublishedAsset(meta.path,
+            { cache: "no-store", signal }, (latestDashboardData || {})._assetRoot);
         if (!current()) return;
         if (!response.ok) {
             throw new Error("영상 파일을 불러오지 못했습니다 (" + response.status + ")");
@@ -11380,21 +11379,43 @@ async function fetchResponse(url, options) {
 }
 
 const LIVE_PUBLISH_ROOT = 'https://raw.githubusercontent.com/leoanjm/rl-supervisor/live-data/';
-function livePublishedAsset(path) {
+function livePublishedAsset(path, root=LIVE_PUBLISH_ROOT) {
     if (!/^media\/(rank-[a-f0-9]{24}\.enc|detail-[a-f0-9]{64}\.json)$/.test(path))
         throw new Error('게시 자료 경로 검증 실패');
-    return LIVE_PUBLISH_ROOT + path;
+    if (!/^https:\/\/raw\.githubusercontent\.com\/leoanjm\/rl-supervisor\/(live-data|live-tick-[0-9]+)\/$/.test(root))
+        throw new Error('게시 자료 출처 검증 실패');
+    return root + path;
 }
-function liveStateUrl() { return LIVE_PUBLISH_ROOT + 'data.json?refresh=' + Date.now(); }
+async function fetchPublishedAsset(path, options, root=LIVE_PUBLISH_ROOT) {
+    let response=await fetchResponse(livePublishedAsset(path,root),options);
+    // Retired state refs do not retire the retained video/analysis files.
+    if (response.status===404 && root!==LIVE_PUBLISH_ROOT)
+        response=await fetchResponse(livePublishedAsset(path),options);
+    return response;
+}
+async function liveStateResponse(method) {
+    const minute = Math.floor(Date.now()/60000);
+    // The preceding minute is closed before it is requested, so CDN caching
+    // is safe. Current/older slots cover first startup and a slow publication.
+    for (const tick of [minute-1,minute,minute-2]) {
+        const root = LIVE_PUBLISH_ROOT.replace('/live-data/','/live-tick-'+tick+'/');
+        const response = await fetchResponse(root+'data.json', {method,cache:'no-store'});
+        if (response.status===404) continue;
+        if (!response.ok) throw new Error('학습 상태 수신 실패 ('+response.status+')');
+        response.snapshotRoot=root;
+        return response;
+    }
+    throw new Error('최근 학습 상태가 게시되지 않았습니다');
+}
 const dashboardDetailCache = new Map();
-async function hydrateDashboardDetails(data) {
+async function hydrateDashboardDetails(data, assetRoot) {
     const allowed = new Set(['rehearsal','studies','zero_stop','policies']);
     const values = await Promise.all(Object.entries(data._details || {}).map(async ([name,path]) => {
         if (!allowed.has(name) || !/^media\/detail-[a-f0-9]{64}\.json$/.test(path))
             throw new Error('분석 자료 경로 검증 실패');
         if (!dashboardDetailCache.has(path)) {
             const pending = (async () => {
-                const response = await fetchResponse(livePublishedAsset(path), {cache:'force-cache'});
+                const response = await fetchPublishedAsset(path, {cache:'force-cache'}, assetRoot);
                 if (!response.ok) throw new Error('분석 자료 수신 실패 ('+response.status+')');
                 return decrypt(await response.json(), passphrase);
             })().catch(error => {dashboardDetailCache.delete(path);throw error;});
@@ -11411,7 +11432,7 @@ async function load() {
     // so downloading, parsing and decrypting it every 30 seconds when nothing
     // changed made an open dashboard progressively expensive.
     if (latestDataVersion) {
-        const probe = await fetchResponse(liveStateUrl(), {method: "HEAD", cache: "no-store"});
+        const probe = await liveStateResponse('HEAD');
         if (!probe.ok) throw new Error("data.json 상태를 확인하지 못했습니다 (" + probe.status + ")");
         const probedVersion = responseVersion(probe);
         if (probedVersion && probedVersion === latestDataVersion) {
@@ -11423,10 +11444,12 @@ async function load() {
         }
     }
 
-    const res = await fetchResponse(liveStateUrl(), { cache: "no-store" });
+    const res = await liveStateResponse('GET');
     if (!res.ok) throw new Error("data.json 을 불러오지 못했습니다 (" + res.status + ")");
     const envelope = await res.json();
-    const data = expandPackedHistory(await hydrateDashboardDetails(await decrypt(envelope, passphrase)));
+    const decoded = await decrypt(envelope, passphrase);
+    decoded._assetRoot=res.snapshotRoot;
+    const data = expandPackedHistory(await hydrateDashboardDetails(decoded,res.snapshotRoot));
     latestDataVersion = responseVersion(res);
     latestEnvelope = envelope;
     lastSuccessAt = Date.now();
